@@ -167,9 +167,9 @@ export class Router {
     let transformedValue = value;
 
     for (const pipe of pipes) {
-      const pipeInstance = this.isPipeInstance(pipe)
+      const pipeInstance: PipeTransform = this.isPipeInstance(pipe)
         ? pipe
-        : this.container.resolve(pipe);
+        : this.container.resolve<PipeTransform>(pipe);
       transformedValue = await pipeInstance.transform(
         transformedValue,
         metadata
@@ -179,8 +179,15 @@ export class Router {
     return transformedValue;
   }
 
-  private isPipeInstance(pipe: any): pipe is PipeTransform {
-    return typeof pipe === 'object' && 'transform' in pipe;
+  private isPipeInstance(
+    pipe: Type<PipeTransform> | PipeTransform
+  ): pipe is PipeTransform {
+    return (
+      typeof pipe === 'object' &&
+      pipe !== null &&
+      'transform' in pipe &&
+      typeof (pipe as PipeTransform).transform === 'function'
+    );
   }
 
   private createRouteHandler(controllerClass: Type): ViewHandler {
