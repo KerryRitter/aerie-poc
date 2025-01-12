@@ -1,9 +1,8 @@
-/// <reference types="reflect-metadata" />
-import 'reflect-metadata';
 import type { Type } from '../types';
 import { getControllerMetadata } from './http.decorator';
 
 export const MODULE_METADATA_KEY = Symbol('MODULE');
+export const MODULE_REF_KEY = Symbol('MODULE_REF');
 
 export type ModuleOptions = {
   imports?: Type[];
@@ -37,11 +36,21 @@ export function Module(options: ModuleOptions) {
           );
         }
 
+        // Store reference to the module in the controller
+        Reflect.defineMetadata(MODULE_REF_KEY, target, controller);
+
         if (metadata.type === 'api') {
           apiControllers.push(controller);
         } else if (metadata.type === 'view') {
           viewControllers.push(controller);
         }
+      }
+    }
+
+    // Store module reference in providers
+    if (options.providers) {
+      for (const provider of options.providers) {
+        Reflect.defineMetadata(MODULE_REF_KEY, target, provider);
       }
     }
 
@@ -55,6 +64,8 @@ export function Module(options: ModuleOptions) {
       module: target.name,
       apiControllers: apiControllers.map((c) => c.name),
       viewControllers: viewControllers.map((c) => c.name),
+      providers: options.providers?.map((p) => p.name),
+      imports: options.imports?.map((m) => m.name),
     });
 
     Reflect.defineMetadata(MODULE_METADATA_KEY, metadata, target);
@@ -64,4 +75,8 @@ export function Module(options: ModuleOptions) {
 
 export function getModuleMetadata(target: any): ModuleMetadata | undefined {
   return Reflect.getMetadata(MODULE_METADATA_KEY, target);
+}
+
+export function getModuleRef(target: Type): Type | undefined {
+  return Reflect.getMetadata(MODULE_REF_KEY, target);
 }

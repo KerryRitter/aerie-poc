@@ -37,11 +37,12 @@ export class AppBootstrap {
     // Create a new module that extends the root module and includes AerieCommonModule
     @Module({
       imports: [...(rootMetadata.imports || []), AerieCommonModule],
-      providers: rootMetadata.providers || [],
       controllers:
         rootMetadata.apiControllers?.concat(
           rootMetadata.viewControllers || []
         ) || [],
+      providers: [...(rootMetadata.providers || [])],
+      exports: [...(rootMetadata.exports || [])],
     })
     class EnhancedRootModule extends this.config.rootModule {}
 

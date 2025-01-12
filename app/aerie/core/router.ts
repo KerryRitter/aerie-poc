@@ -367,6 +367,8 @@ export class Router {
   }
 
   createRemixApiRoute() {
+    bootstrap(this.config).ensureRootInitialized();
+
     return {
       loader: async (args: LoaderFunctionArgs) => {
         const path = args.params['*'] || '';

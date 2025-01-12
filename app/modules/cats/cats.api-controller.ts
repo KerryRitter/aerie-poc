@@ -11,10 +11,12 @@ import {
   HttpCode,
   Header,
 } from '../../aerie/core/decorators/http-response.decorator';
+import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
 import { CatsServerService } from './cats.server-service';
 import type { Cat } from './cats.types';
 import { ParseIntPipe } from '../../aerie/core/pipes';
 
+@Dependencies(CatsServerService)
 @ApiController('cats')
 export class CatsApiController {
   constructor(private readonly catsService: CatsServerService) {}

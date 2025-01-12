@@ -73,7 +73,6 @@ function handleBotRequest(
         },
         onError(error: unknown) {
           didError = true;
-
           console.error(error);
         },
       }
@@ -114,7 +113,6 @@ function handleBrowserRequest(
         },
         onError(error: unknown) {
           didError = true;
-
           console.error(error);
         },
       }

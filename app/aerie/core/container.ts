@@ -2,8 +2,12 @@ import type { Type } from './types';
 import {
   getInjectableMetadata,
   getInjectMetadata,
+  getDependenciesMetadata,
   InjectToken,
 } from './decorators/injectable.decorator';
+
+// Store metadata at module load time
+const metadataStore = new Map<string, any>();
 
 export class Container {
   private static instance: Container;
@@ -25,6 +29,31 @@ export class Container {
       return;
     }
 
+    console.log('=== REGISTERING PROVIDER ===');
+    console.log('Provider:', key);
+    console.log('Dependencies:', getDependenciesMetadata(provider));
+    console.log('=== END REGISTERING PROVIDER ===');
+
+    // Store metadata when registering the provider
+    if (!metadataStore.has(key)) {
+      const dependencies = getDependenciesMetadata(provider) || [];
+      const injectableMetadata = getInjectableMetadata(provider);
+      const injectMetadata = getInjectMetadata(provider);
+
+      console.log('=== STORING METADATA ===');
+      console.log('Key:', key);
+      console.log('Dependencies:', dependencies);
+      console.log('Injectable Metadata:', injectableMetadata);
+      console.log('Inject Metadata:', injectMetadata);
+      console.log('=== END STORING METADATA ===');
+
+      metadataStore.set(key, {
+        dependencies,
+        injectableMetadata,
+        injectMetadata,
+      });
+    }
+
     this.providers.set(key, provider);
   }
 
@@ -42,25 +71,35 @@ export class Container {
       return existingInstance;
     }
 
-    // Get injectable metadata
-    const injectableMetadata = getInjectableMetadata(provider);
-    const injectMetadata = getInjectMetadata(provider);
+    console.log('=== RESOLVING PROVIDER ===');
+    console.log('Token:', key);
+    console.log('Provider:', provider.name);
+    console.log('Metadata Store:', metadataStore);
+    console.log('=== END RESOLVING PROVIDER ===');
 
-    // Get constructor parameter types
-    const paramTypes = Reflect.getMetadata('design:paramtypes', provider) || [];
+    // Get metadata from our store
+    const metadata = metadataStore.get(key) || {
+      dependencies: [],
+      injectableMetadata: {},
+      injectMetadata: {},
+    };
+
+    const { dependencies, injectableMetadata, injectMetadata } = metadata;
 
     // Resolve dependencies recursively
-    const dependencies = paramTypes.map((paramType: Type, index: number) => {
-      // Check if we have a custom injection token
-      const injectToken = injectMetadata?.[index];
-      if (injectToken) {
-        return this.resolve(injectToken);
+    const resolvedDependencies = dependencies.map(
+      (dependency: InjectToken, index: number) => {
+        // Check if we have a custom injection token
+        const injectToken = injectMetadata?.[index];
+        if (injectToken) {
+          return this.resolve(injectToken);
+        }
+        return this.resolve(dependency);
       }
-      return this.resolve(paramType);
-    });
+    );
 
     // Create instance
-    const instance = new provider(...dependencies);
+    const instance = new provider(...resolvedDependencies);
 
     // Cache instance if singleton (default)
     if (
