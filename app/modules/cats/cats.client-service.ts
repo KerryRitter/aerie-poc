@@ -2,20 +2,9 @@ import { Injectable } from '~/aerie/core/decorators/injectable.decorator';
 import { ClientOnly } from '~/aerie/core/environment/decorators';
 import type { Cat } from './cats.types';
 
-@ClientOnly()
 @Injectable()
 export class CatsClientService {
-  private cats: Cat[] = [];
-
-  setCats(cats: Cat[]) {
-    this.cats = cats;
+  renderCatLabel(cat: Cat) {
+    return `${cat.name} - ${cat.breed} (${cat.age} years old)`;
   }
-
-  getCats(): Cat[] {
-    return this.cats;
-  }
-
-  addCat(cat: Cat) {
-    this.cats = [...this.cats, cat];
-  }
-} 
+}

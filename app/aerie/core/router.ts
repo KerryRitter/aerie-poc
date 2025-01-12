@@ -1,25 +1,21 @@
 import type {
-  LoaderFunction,
   ActionFunction,
-  LoaderFunctionArgs,
   ActionFunctionArgs,
+  LoaderFunction,
+  LoaderFunctionArgs,
 } from '@remix-run/node';
-import type { Params } from '@remix-run/react';
 import { json } from '@remix-run/node';
+import { useLoaderData } from '@remix-run/react';
 import { matchPath } from '@remix-run/router';
-import { Container } from './container';
-import { getControllerMetadata } from './decorators/http.decorator';
-import { getParamsMetadata } from './decorators/http-params.decorator';
-import {
-  getHttpCodeMetadata,
-  getHeadersMetadata,
-} from './decorators/http-response.decorator';
-import { MODULE_METADATA_KEY } from './decorators/module.decorator';
-import { getInjectMetadata } from './decorators/injectable.decorator';
-import { getEnvironmentMetadata } from './environment/decorators';
 import type { ReactElement } from 'react';
-import type { Constructor } from './types';
+import * as React from 'react';
+import { ModuleLoaderProvider } from '../react/hooks';
+import { Container } from './container';
+import { getParamsMetadata } from './decorators/http-params.decorator';
+import { getControllerMetadata } from './decorators/http.decorator';
 import type { RouteMetadata } from './decorators/types';
+import { ModuleLoader } from './module-loader';
+import type { Constructor } from './types';
 
 type ModuleRoute = {
   path: string;
@@ -35,7 +31,10 @@ type ModuleRoute = {
 type ViewHandler = {
   loader: LoaderFunction;
   action: ActionFunction;
-  component?: ReactElement;
+};
+
+type ViewRegistry = {
+  [key: string]: React.ComponentType<any>;
 };
 
 export class Router {
@@ -43,6 +42,7 @@ export class Router {
   private readonly container: Container;
   private routeRegistry: Map<string, { controller: any; path: string }> =
     new Map();
+  private viewRegistry: ViewRegistry = {};
 
   private constructor() {
     this.container = Container.getInstance();
@@ -76,6 +76,18 @@ export class Router {
       controller: controllerClass,
       path: controllerMetadata.path,
     });
+
+    // Register view components if this is a view controller
+    if (controllerMetadata.type === 'view') {
+      for (const [_, routeMetadata] of controllerMetadata.routes) {
+        if (routeMetadata.component) {
+          const viewId = `${controllerMetadata.path}/${routeMetadata.path}`
+            .replace(/\/+/g, '/')
+            .replace(/^\/+|\/+$/g, '');
+          this.viewRegistry[viewId] = () => routeMetadata.component!;
+        }
+      }
+    }
   }
 
   getModuleRoutes(): ModuleRoute[] {
@@ -113,11 +125,20 @@ export class Router {
     return routes;
   }
 
-  getRouteHandler(path: string): ViewHandler | undefined {
+  getRouteHandler(
+    path: string,
+    isApi: boolean = false
+  ): ViewHandler | undefined {
     console.log('Getting route handler for path:', path);
-    const normalizedPath = path.replace(/^\/+|\/+$/g, '');
+    // For API routes, ensure path starts with api/
+    const normalizedPath = isApi
+      ? `api/${path}`.replace(/^api\/+/, 'api/').replace(/\/+$/, '')
+      : path.replace(/^\/+|\/+$/g, '');
 
     for (const [name, route] of this.routeRegistry) {
+      const metadata = getControllerMetadata(route.controller);
+      if (!metadata || metadata.type !== (isApi ? 'api' : 'view')) continue;
+
       const normalizedRoutePath = route.path.replace(/^\/+|\/+$/g, '');
       console.log('Checking HTTP route:', {
         name,
@@ -190,7 +211,11 @@ export class Router {
         }
 
         // Parse params using matchPath
-        const fullPattern = `/${metadata.path}${routeMetadata.path.startsWith('/') ? '' : '/'}${routeMetadata.path}`;
+        const fullPattern = ['', metadata.path, routeMetadata.path]
+          .filter(Boolean)
+          .join('/')
+          .replace(/\/+/g, '/');
+
         console.log('Matching full pattern:', {
           pattern: fullPattern,
           pathname: url.pathname,
@@ -217,12 +242,17 @@ export class Router {
         const result = await Reflect.apply(handlerFn, controller, args);
 
         // For API controllers, return the result directly
-        // For view controllers with no component, return null
-        if (metadata.type === 'view' && !routeMetadata.component) {
-          return null;
+        if (metadata.type === 'api') {
+          return json(result);
         }
 
-        return result;
+        // For view controllers, return the result with a flag indicating which component to render
+        return json({
+          ...result,
+          __viewId: `${metadata.path}/${routeMetadata.path}`
+            .replace(/\/+/g, '/')
+            .replace(/^\/+|\/+$/g, ''),
+        });
       },
       action: async ({ request, params }: ActionFunctionArgs) => {
         const url = new URL(request.url);
@@ -251,7 +281,11 @@ export class Router {
         }
 
         // Parse params using matchPath
-        const fullPattern = `/${metadata.path}${routeMetadata.path.startsWith('/') ? '' : '/'}${routeMetadata.path}`;
+        const fullPattern = ['', metadata.path, routeMetadata.path]
+          .filter(Boolean)
+          .join('/')
+          .replace(/\/+/g, '/');
+
         console.log('Matching full pattern:', {
           pattern: fullPattern,
           pathname: url.pathname,
@@ -280,18 +314,18 @@ export class Router {
         const result = await Reflect.apply(handlerFn, controller, args);
 
         // For API controllers, return the result directly
-        // For view controllers with no component, return null
-        if (metadata.type === 'view' && !routeMetadata.component) {
-          return null;
+        if (metadata.type === 'api') {
+          return json(result);
         }
 
-        return result;
+        // For view controllers, return the result with a flag indicating which component to render
+        return json({
+          ...result,
+          __viewId: `${metadata.path}/${routeMetadata.path}`
+            .replace(/\/+/g, '/')
+            .replace(/^\/+|\/+$/g, ''),
+        });
       },
-      // Only return component for view controllers with a component
-      component:
-        metadata.type === 'view'
-          ? Array.from(metadata.routes.values())[0]?.component
-          : undefined,
     };
   }
 
@@ -308,19 +342,54 @@ export class Router {
     return regex.test(path);
   }
 
-  createRemixRoute() {
+  createRemixApiRoute() {
     return {
       loader: async (args: LoaderFunctionArgs) => {
-        const handler = this.getRouteHandler(args.params['*'] || '');
+        const path = args.params['*'] || '';
+        const handler = this.getRouteHandler(path, true);
         if (!handler) return null;
         return handler.loader(args);
       },
       action: async (args: ActionFunctionArgs) => {
-        const handler = this.getRouteHandler(args.params['*'] || '');
+        const path = args.params['*'] || '';
+        const handler = this.getRouteHandler(path, true);
         if (!handler) return null;
         return handler.action(args);
       },
-      // Component: () => null,
+    };
+  }
+
+  createRemixViewRoute() {
+    const router = this;
+    const moduleLoader = new ModuleLoader(this.container);
+
+    const CatchAllRoute: React.FC = () => {
+      const data = useLoaderData<{ __viewId?: string }>();
+      const Component = data.__viewId
+        ? router.viewRegistry[data.__viewId]
+        : null;
+
+      return React.createElement(
+        ModuleLoaderProvider,
+        { value: moduleLoader },
+        Component ? React.createElement(Component) : null
+      );
+    };
+
+    return {
+      loader: async (args: LoaderFunctionArgs) => {
+        const path = args.params['*'] || '';
+        const handler = this.getRouteHandler(path, false);
+        if (!handler) return null;
+        return handler.loader(args);
+      },
+      action: async (args: ActionFunctionArgs) => {
+        const path = args.params['*'] || '';
+        const handler = this.getRouteHandler(path, false);
+        if (!handler) return null;
+        return handler.action(args);
+      },
+      Component: CatchAllRoute,
     };
   }
 }

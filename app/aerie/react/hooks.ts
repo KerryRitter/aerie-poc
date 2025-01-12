@@ -8,7 +8,9 @@ export const ModuleLoaderProvider = ModuleLoaderContext.Provider;
 export function useModuleLoader() {
   const loader = useContext(ModuleLoaderContext);
   if (!loader) {
-    throw new Error('useModuleLoader must be used within a ModuleLoaderProvider');
+    throw new Error(
+      'useModuleLoader must be used within a ModuleLoaderProvider'
+    );
   }
   return loader;
 }
@@ -18,4 +20,4 @@ export function useProvider<T>(token: string | symbol): T;
 export function useProvider<T>(token: any): T {
   const loader = useModuleLoader();
   return loader.getProvider<T>(token);
-} 
+}
