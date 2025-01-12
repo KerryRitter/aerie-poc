@@ -5,6 +5,7 @@ import type { Constructor } from '../types';
 export const MODULE_METADATA_KEY = Symbol('MODULE');
 
 export type ModuleOptions = {
+  imports?: Constructor[];
   controllers?: Constructor[];
   providers?: Constructor[];
   exports?: Constructor[];

@@ -1,15 +1,24 @@
 import * as React from 'react';
-import { Controller, Json, Loader } from '../../aerie/core/decorators/http.decorator';
-import { Body, Param, Query } from '../../aerie/core/decorators/http-params.decorator';
-import { HttpCode, Header } from '../../aerie/core/decorators/http-response.decorator';
+import {
+  Controller,
+  Json,
+  Loader,
+} from '../../aerie/core/decorators/http.decorator';
+import {
+  Body,
+  Param,
+  Query,
+} from '../../aerie/core/decorators/http-params.decorator';
+import {
+  HttpCode,
+  Header,
+} from '../../aerie/core/decorators/http-response.decorator';
 import { CatsServerService } from './cats.service-server';
 import { CatsClientService } from './cats.service-client';
 import type { Cat } from './cats.types';
 
 const TestRoute = () => {
-  return (
-    <div>Test Route</div>
-  );
+  return <div>Test Route</div>;
 };
 
 @Controller('cats')
@@ -32,7 +41,7 @@ export class CatsController {
     const cats = await this.catsService.findAll();
     // Update client-side state
     this.catsClientService.setCats(cats);
-    
+
     if (limit) {
       return cats.slice(0, parseInt(limit));
     }
@@ -61,4 +70,4 @@ export class CatsController {
     await this.catsService.delete(parseInt(id));
     return;
   }
-} 
+}

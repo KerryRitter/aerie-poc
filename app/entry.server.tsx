@@ -5,12 +5,16 @@
  */
 
 import 'reflect-metadata';
-import { PassThrough } from "stream";
-import { createReadableStreamFromReadable, type EntryContext } from "@remix-run/node";
-import { RemixServer } from "@remix-run/react";
-import { isbot } from "isbot";
-import { renderToPipeableStream } from "react-dom/server";
-import { router } from './aerie/core/bootstrap';
+import { PassThrough } from 'stream';
+import {
+  createReadableStreamFromReadable,
+  type EntryContext,
+} from '@remix-run/node';
+import { RemixServer } from '@remix-run/react';
+import { isbot } from 'isbot';
+import { renderToPipeableStream } from 'react-dom/server';
+import { bootstrap } from './aerie/core/bootstrap';
+import { AppModule } from './app.module';
 
 const ABORT_DELAY = 5000;
 
@@ -20,9 +24,10 @@ export default function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  // Make sure router is initialized
+  // Initialize the framework
+  bootstrap().registerModule(AppModule);
 
-  return isbot(request.headers.get("user-agent"))
+  return isbot(request.headers.get('user-agent'))
     ? handleBotRequest(
         request,
         responseStatusCode,
@@ -52,7 +57,7 @@ function handleBotRequest(
         onAllReady() {
           const body = new PassThrough();
 
-          responseHeaders.set("Content-Type", "text/html");
+          responseHeaders.set('Content-Type', 'text/html');
 
           resolve(
             new Response(createReadableStreamFromReadable(body), {
@@ -93,7 +98,7 @@ function handleBrowserRequest(
         onShellReady() {
           const body = new PassThrough();
 
-          responseHeaders.set("Content-Type", "text/html");
+          responseHeaders.set('Content-Type', 'text/html');
 
           resolve(
             new Response(createReadableStreamFromReadable(body), {

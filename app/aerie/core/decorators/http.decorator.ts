@@ -3,8 +3,6 @@ import type { RouteMetadata, HttpMethod } from './types';
 import type { Constructor } from '../types';
 import type { ReactElement } from 'react';
 
-type MethodDecoratorContext = ClassMethodDecoratorContext<any, any>;
-
 export const Json = {
   Get: (path: string = '') => createRouteDecorator('GET', path, true),
   Post: (path: string = '') => createRouteDecorator('POST', path, true),
@@ -52,12 +50,23 @@ function createRouteDecorator(
     propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ) {
-    const controller = Reflect.getMetadata(
+    // Get or create controller metadata
+    let controller = Reflect.getMetadata(
       CONTROLLER_METADATA_KEY,
       target.constructor
     );
+
     if (!controller) {
-      throw new Error(`Class must be decorated with @Controller`);
+      // Initialize empty controller metadata if not found
+      controller = {
+        path: '',
+        routes: new Map<string | symbol, RouteMetadata>(),
+      };
+      Reflect.defineMetadata(
+        CONTROLLER_METADATA_KEY,
+        controller,
+        target.constructor
+      );
     }
 
     const routes = controller.routes;

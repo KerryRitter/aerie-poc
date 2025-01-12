@@ -1,21 +1,24 @@
-import type { LoaderFunction, ActionFunction, LoaderFunctionArgs, ActionFunctionArgs } from '@remix-run/node';
+import type {
+  LoaderFunction,
+  ActionFunction,
+  LoaderFunctionArgs,
+  ActionFunctionArgs,
+} from '@remix-run/node';
 import type { Params } from '@remix-run/react';
 import { json } from '@remix-run/node';
 import { Container } from './container';
 import { getControllerMetadata } from './decorators/http.decorator';
 import { getParamsMetadata } from './decorators/http-params.decorator';
-import { getHttpCodeMetadata, getHeadersMetadata, getRedirectMetadata } from './decorators/http-response.decorator';
+import {
+  getHttpCodeMetadata,
+  getHeadersMetadata,
+} from './decorators/http-response.decorator';
 import { MODULE_METADATA_KEY } from './decorators/module.decorator';
 import { getInjectMetadata } from './decorators/injectable.decorator';
 import { getEnvironmentMetadata } from './environment/decorators';
 import type { ReactElement } from 'react';
 import type { Constructor } from './types';
 import type { RouteMetadata } from './decorators/types';
-
-type HttpContext = {
-  request: Request;
-  params: Params;
-};
 
 type ModuleRoute = {
   path: string;
@@ -36,7 +39,8 @@ type ViewHandler = {
 export class Router {
   private static instance: Router;
   private readonly container: Container;
-  private routeRegistry: Map<string, { controller: any; path: string }> = new Map();
+  private routeRegistry: Map<string, { controller: any; path: string }> =
+    new Map();
 
   private constructor() {
     this.container = Container.getInstance();
@@ -49,70 +53,32 @@ export class Router {
     return Router.instance;
   }
 
-  registerModuleRoutes(moduleClass: Constructor) {
-    const metadata = Reflect.getMetadata(MODULE_METADATA_KEY, moduleClass);
-    console.log('Registering module:', {
-      moduleClass: moduleClass.name,
-      metadata: {
-        ...metadata,
-        providers: metadata?.providers?.map((p: Constructor) => ({
-          name: p.name,
-          isClass: typeof p === 'function',
-          constructorString: p.toString(),
-          paramTypes: Reflect.getMetadata('design:paramtypes', p)?.map((t: Constructor) => t?.name),
-          injectMetadata: getInjectMetadata(p),
-          envMetadata: getEnvironmentMetadata(p)
-        })),
-        controllers: metadata?.controllers?.map((c: Constructor) => c.name)
-      }
+  getContainer(): Container {
+    return this.container;
+  }
+
+  registerController(controllerClass: Constructor) {
+    const controllerMetadata = getControllerMetadata(controllerClass);
+    if (!controllerMetadata) {
+      console.log('No controller metadata for:', controllerClass.name);
+      return;
+    }
+
+    console.log('Registering controller:', {
+      name: controllerClass.name,
+      path: controllerMetadata.path,
+      metadata: controllerMetadata,
     });
-    
-    // Register providers first
-    if (metadata?.providers) {
-      console.log('Raw providers:', metadata.providers);
-      for (const provider of metadata.providers) {
-        console.log('Registering provider:', {
-          name: provider.name,
-          isClass: typeof provider === 'function',
-          provider,
-          constructorString: provider.toString(),
-          paramTypes: Reflect.getMetadata('design:paramtypes', provider)?.map((t: Constructor) => t?.name),
-          injectMetadata: getInjectMetadata(provider),
-          envMetadata: getEnvironmentMetadata(provider)
-        });
-        this.container.register(provider);
-      }
-    }
-    
-    // Register HTTP controllers
-    if (metadata?.controllers) {
-      for (const controllerClass of metadata.controllers) {
-        const controllerMetadata = getControllerMetadata(controllerClass);
-        if (!controllerMetadata) {
-          console.log('No controller metadata for:', controllerClass.name);
-          continue;
-        }
 
-        console.log('Registering controller:', {
-          name: controllerClass.name,
-          path: controllerMetadata.path,
-          metadata: controllerMetadata
-        });
-
-        // Register the controller as a provider
-        this.container.register(controllerClass);
-        this.routeRegistry.set(controllerClass.name, {
-          controller: controllerClass,
-          path: controllerMetadata.path,
-        });
-      }
-    }
+    this.routeRegistry.set(controllerClass.name, {
+      controller: controllerClass,
+      path: controllerMetadata.path,
+    });
   }
 
   getModuleRoutes(): ModuleRoute[] {
     const routes: ModuleRoute[] = [];
 
-    // Process HTTP controllers
     for (const [controllerName, { controller, path }] of this.routeRegistry) {
       const metadata = getControllerMetadata(controller);
       if (!metadata) continue;
@@ -121,22 +87,20 @@ export class Router {
       const route: ModuleRoute = {
         path: modulePath,
         layout: `${modulePath}/layout.tsx`,
-        children: []
+        children: [],
       };
 
-      // Add index route
       route.children.push({
         path: '',
         component: `${modulePath}/route.tsx`,
-        options: { index: true }
+        options: { index: true },
       });
 
-      // Add dynamic routes
       for (const [, routeMetadata] of metadata.routes) {
         if (routeMetadata.path && routeMetadata.path !== '/') {
           route.children.push({
             path: routeMetadata.path.replace(/^\//, ''),
-            component: `${modulePath}/${routeMetadata.path.replace(/^\//, '')}.tsx`
+            component: `${modulePath}/${routeMetadata.path.replace(/^\//, '')}.tsx`,
           });
         }
       }
@@ -149,20 +113,17 @@ export class Router {
 
   getRouteHandler(path: string): ViewHandler | undefined {
     console.log('Getting route handler for path:', path);
-
-    // Normalize paths for comparison
     const normalizedPath = path.replace(/^\/+|\/+$/g, '');
 
-    // Check HTTP controllers
     for (const [name, route] of this.routeRegistry) {
       const normalizedRoutePath = route.path.replace(/^\/+|\/+$/g, '');
-      console.log('Checking HTTP route:', { 
-        name, 
-        routePath: normalizedRoutePath, 
+      console.log('Checking HTTP route:', {
+        name,
+        routePath: normalizedRoutePath,
         requestPath: normalizedPath,
-        isMatch: normalizedPath === normalizedRoutePath 
+        isMatch: normalizedPath === normalizedRoutePath,
       });
-      
+
       if (normalizedPath === normalizedRoutePath) {
         console.log('Found matching HTTP route:', name);
         return this.createRouteHandler(route.controller);
@@ -178,114 +139,141 @@ export class Router {
       throw new Error(`${controllerClass.name} is not a valid controller`);
     }
 
-    const controller = this.container.resolve(controllerClass) as Record<string | symbol, Function>;
+    const controller = this.container.resolve(controllerClass) as Record<
+      string | symbol,
+      Function
+    >;
 
     return {
-      loader: async (args: LoaderFunctionArgs) => {
-        const entries = Array.from(metadata.routes.entries()) as Array<[string | symbol, RouteMetadata]>;
-        const methodEntry = entries.find(([_, route]) => route.method === 'GET');
-        const method = methodEntry?.[0];
+      loader: async ({ request, params }: LoaderFunctionArgs) => {
+        const url = new URL(request.url);
+        const path =
+          url.pathname.replace(metadata.path, '').replace(/^\/+|\/+$/g, '') ||
+          '/';
+        console.log('Loader path matching:', {
+          url: url.pathname,
+          controllerPath: metadata.path,
+          matchPath: path,
+        });
 
-        if (!method) {
-          throw new Error('No GET handler found');
+        const entries = Array.from(metadata.routes.entries()) as Array<
+          [string | symbol, RouteMetadata]
+        >;
+        const methodEntry = entries.find(([_, route]) => {
+          return (
+            route.method === 'GET' && this.matchRoute(route.path || '/', path)
+          );
+        });
+
+        if (!methodEntry) {
+          console.log('No matching GET route found');
+          return null;
         }
 
-        const handlerFn = Reflect.get(controller, method);
+        const [method, routeMetadata] = methodEntry;
+        console.log('Found matching route:', {
+          method: String(method),
+          metadata: routeMetadata,
+        });
+
+        const handlerFn = controller[method as string];
         if (!handlerFn) {
           throw new Error('No GET handler method found');
         }
 
-        const result = await Reflect.apply(handlerFn, controller, [args]);
-        const routeMetadata = metadata.routes.get(method);
-        
-        // If this is a JSON endpoint, wrap the response in json()
-        if (routeMetadata?.isJson) {
-          return json(result);
+        const paramMetadata = getParamsMetadata(controller, method);
+        const args = await Promise.all(
+          paramMetadata.map(async (param) => {
+            switch (param.type) {
+              case 'PARAM':
+                return param.data ? params[param.data] || null : null;
+              case 'QUERY':
+                return param.data
+                  ? url.searchParams.get(param.data)
+                  : Object.fromEntries(url.searchParams);
+              default:
+                return undefined;
+            }
+          })
+        );
+
+        const result = await Reflect.apply(handlerFn, controller, args);
+
+        if (routeMetadata.isJson) {
+          const statusCode = getHttpCodeMetadata(controller, method) || 200;
+          const headers = getHeadersMetadata(controller, method);
+          return json(result, { status: statusCode, headers });
         }
-        
+
         return result;
       },
-      action: async (args: ActionFunctionArgs) => {
-        const entries = Array.from(metadata.routes.entries()) as Array<[string | symbol, RouteMetadata]>;
-        const methodEntry = entries.find(([_, route]) => route.method !== 'GET');
-        const method = methodEntry?.[0];
+      action: async ({ request, params }: ActionFunctionArgs) => {
+        const url = new URL(request.url);
+        const path =
+          url.pathname.replace(metadata.path, '').replace(/^\/+|\/+$/g, '') ||
+          '/';
 
-        if (!method) {
-          throw new Error('No non-GET handler found');
+        const entries = Array.from(metadata.routes.entries()) as Array<
+          [string | symbol, RouteMetadata]
+        >;
+        const methodEntry = entries.find(([_, route]) => {
+          return (
+            route.method === request.method &&
+            this.matchRoute(route.path || '/', path)
+          );
+        });
+
+        if (!methodEntry) {
+          throw new Error(`No matching ${request.method} handler found`);
         }
 
-        const handlerFn = Reflect.get(controller, method);
+        const [method, routeMetadata] = methodEntry;
+        const handlerFn = controller[method as string];
         if (!handlerFn) {
-          throw new Error('No non-GET handler method found');
+          throw new Error(`No ${request.method} handler method found`);
         }
 
-        const result = await Reflect.apply(handlerFn, controller, [args]);
-        const routeMetadata = metadata.routes.get(method);
-        
-        // If this is a JSON endpoint, wrap the response in json()
-        if (routeMetadata?.isJson) {
-          return json(result);
+        const paramMetadata = getParamsMetadata(controller, method);
+        const args = await Promise.all(
+          paramMetadata.map(async (param) => {
+            switch (param.type) {
+              case 'PARAM':
+                return param.data ? params[param.data] || null : null;
+              case 'BODY':
+                return request.json();
+              case 'QUERY':
+                return param.data
+                  ? url.searchParams.get(param.data)
+                  : Object.fromEntries(url.searchParams);
+              default:
+                return undefined;
+            }
+          })
+        );
+
+        const result = await Reflect.apply(handlerFn, controller, args);
+
+        if (routeMetadata.isJson) {
+          const statusCode = getHttpCodeMetadata(controller, method) || 200;
+          const headers = getHeadersMetadata(controller, method);
+          return json(result, { status: statusCode, headers });
         }
-        
+
         return result;
-      }
+      },
     };
   }
 
-  private async executeHandler(
-    controller: any,
-    methodName: string | symbol,
-    context: HttpContext
-  ) {
-    const params = getParamsMetadata(controller, methodName);
-    const args = await Promise.all(
-      params.map(async param => {
-        switch (param.type) {
-          case 'PARAM':
-            return param.data ? context.params[param.data] || null : null;
-          case 'BODY':
-            return context.request.json();
-          case 'QUERY':
-            const url = new URL(context.request.url);
-            return param.data 
-              ? url.searchParams.get(param.data)
-              : Object.fromEntries(url.searchParams);
-          case 'HEADERS':
-            return param.data
-              ? context.request.headers.get(param.data)
-              : Object.fromEntries(context.request.headers);
-          default:
-            return undefined;
-        }
-      })
-    );
-
-    return controller[methodName as string](...args);
-  }
-
-  private createResponse(result: any, controller: any, methodName: string | symbol) {
-    const statusCode = getHttpCodeMetadata(controller, methodName) || 200;
-    const headers = getHeadersMetadata(controller, methodName);
-    const redirect = getRedirectMetadata(controller, methodName);
-
-    if (redirect) {
-      return new Response(null, {
-        status: redirect.statusCode,
-        headers: { Location: redirect.url, ...headers }
-      });
-    }
-
-    return json(result, {
-      status: statusCode,
-      headers
-    });
-  }
-
   private matchRoute(pattern: string, path: string): boolean {
-    // Convert route pattern to regex
     const regex = new RegExp(
-      '^' + pattern.replace(/:[^\s/]+/g, '([^/]+)') + '$'
+      '^' + pattern.replace(/:[^\s/]+/g, '([^/]+)').replace(/\/$/, '') + '/?$'
     );
+    console.log('Route matching:', {
+      pattern,
+      path,
+      regex: regex.toString(),
+      matches: regex.test(path),
+    });
     return regex.test(path);
   }
 
@@ -301,7 +289,7 @@ export class Router {
         if (!handler) return null;
         return handler.action(args);
       },
-      Component: () => null
+      Component: () => null,
     };
   }
-} 
+}
