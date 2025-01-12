@@ -3,6 +3,12 @@ import type { RouteMetadata, HttpMethod } from './types';
 import type { Constructor } from '../types';
 import type { ReactElement } from 'react';
 
+// Store routes temporarily until Controller decorator is applied
+const pendingRoutes = new WeakMap<
+  object,
+  Map<string | symbol, RouteMetadata>
+>();
+
 export const Json = {
   Get: (path: string = '') => createRouteDecorator('GET', path, true),
   Post: (path: string = '') => createRouteDecorator('POST', path, true),
@@ -30,10 +36,25 @@ export const Loader = (path: string = '', component?: ReactElement) =>
 export function Controller(prefix: string = '') {
   return function <T extends Constructor>(target: T) {
     console.log('Applying Controller decorator to:', target.name);
+
+    // Get any pending routes that were registered before the Controller decorator
+    const routes = pendingRoutes.get(target.prototype) || new Map();
+
     const metadata = {
       path: prefix,
-      routes: new Map<string | symbol, RouteMetadata>(),
+      routes,
     };
+
+    console.log('Setting controller metadata:', {
+      controller: target.name,
+      path: prefix,
+      routes: Array.from(routes.entries()).map(([key, value]) => ({
+        key: String(key),
+        method: value.method,
+        path: value.path,
+      })),
+    });
+
     Reflect.defineMetadata(CONTROLLER_METADATA_KEY, metadata, target);
     return target;
   };
@@ -50,49 +71,26 @@ function createRouteDecorator(
     propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ) {
-    // Get or create controller metadata
-    let controller = Reflect.getMetadata(
-      CONTROLLER_METADATA_KEY,
-      target.constructor
-    );
-
-    if (!controller) {
-      // Initialize empty controller metadata if not found
-      controller = {
-        path: '',
-        routes: new Map<string | symbol, RouteMetadata>(),
-      };
-      Reflect.defineMetadata(
-        CONTROLLER_METADATA_KEY,
-        controller,
-        target.constructor
-      );
+    // Store route metadata in the pending routes map
+    let routes = pendingRoutes.get(target);
+    if (!routes) {
+      routes = new Map();
+      pendingRoutes.set(target, routes);
     }
 
-    const routes = controller.routes;
     routes.set(propertyKey, { method, path, isJson, component });
 
-    Reflect.defineMetadata(
-      CONTROLLER_METADATA_KEY,
-      { ...controller, routes },
-      target.constructor
-    );
+    console.log('Added route:', {
+      target: target.constructor.name,
+      propertyKey: String(propertyKey),
+      method,
+      path,
+      isJson,
+    });
+
     return descriptor;
   };
 }
-
-// Legacy decorators - mark as deprecated
-/** @deprecated Use Json.Get instead */
-export const Get = (path: string = '') => createRouteDecorator('GET', path);
-/** @deprecated Use Json.Post instead */
-export const Post = (path: string = '') => createRouteDecorator('POST', path);
-/** @deprecated Use Json.Put instead */
-export const Put = (path: string = '') => createRouteDecorator('PUT', path);
-/** @deprecated Use Json.Patch instead */
-export const Patch = (path: string = '') => createRouteDecorator('PATCH', path);
-/** @deprecated Use Json.Delete instead */
-export const Delete = (path: string = '') =>
-  createRouteDecorator('DELETE', path);
 
 export type ControllerMetadata = {
   path: string;
