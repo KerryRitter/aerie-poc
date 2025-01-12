@@ -1,9 +1,14 @@
-import { CatsServerService } from '../../modules/cats/cats.server-service';
-import type { Constructor } from './types';
+import type { Type } from './types';
+import {
+  getInjectableMetadata,
+  getInjectMetadata,
+  InjectToken,
+} from './decorators/injectable.decorator';
 
 export class Container {
   private static instance: Container;
-  private providers = new Map<string, Constructor>();
+  private providers = new Map<string, Type>();
+  private instances = new Map<string, any>();
 
   private constructor() {}
 
@@ -14,40 +19,67 @@ export class Container {
     return Container.instance;
   }
 
-  register(provider: Constructor) {
+  register(provider: Type) {
     const key = provider.name;
     if (this.providers.has(key)) {
-      console.log('Provider already registered:', key);
       return;
     }
 
-    console.log('Registering class provider:', { key, value: provider.name });
     this.providers.set(key, provider);
-    console.log('Current providers:', {
-      keys: Array.from(this.providers.keys()),
-      entries: Array.from(this.providers.entries()).map(([k, v]) => [
-        k,
-        v.name,
-      ]),
-    });
   }
 
-  resolve<T>(token: Constructor<T>): T {
-    const provider = this.providers.get(token.name);
+  resolve<T>(token: InjectToken): T {
+    const key = this.getProviderKey(token);
+    const provider = this.providers.get(key);
+
     if (!provider) {
-      throw new Error(`No provider found for ${token.name}`);
+      throw new Error(`No provider found for ${key}`);
     }
+
+    // Check if we already have an instance
+    const existingInstance = this.instances.get(key);
+    if (existingInstance) {
+      return existingInstance;
+    }
+
+    // Get injectable metadata
+    const injectableMetadata = getInjectableMetadata(provider);
+    const injectMetadata = getInjectMetadata(provider);
 
     // Get constructor parameter types
     const paramTypes = Reflect.getMetadata('design:paramtypes', provider) || [];
 
     // Resolve dependencies recursively
-    const dependencies = paramTypes.map((paramType: Constructor) => {
+    const dependencies = paramTypes.map((paramType: Type, index: number) => {
+      // Check if we have a custom injection token
+      const injectToken = injectMetadata?.[index];
+      if (injectToken) {
+        return this.resolve(injectToken);
+      }
       return this.resolve(paramType);
     });
 
-    dependencies.push(new CatsServerService());
+    // Create instance
+    const instance = new provider(...dependencies);
 
-    return new provider(...dependencies);
+    // Cache instance if singleton (default)
+    if (
+      !injectableMetadata?.scope ||
+      injectableMetadata.scope === 'singleton'
+    ) {
+      this.instances.set(key, instance);
+    }
+
+    return instance;
+  }
+
+  private getProviderKey(token: InjectToken): string {
+    if (typeof token === 'string') {
+      return token;
+    }
+    if (typeof token === 'symbol') {
+      return token.toString();
+    }
+    return token.name;
   }
 }

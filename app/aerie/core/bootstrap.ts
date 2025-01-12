@@ -1,12 +1,13 @@
 import { Router } from './router';
-import type { Constructor } from './types';
-import { getModuleMetadata } from './decorators/module.decorator';
+import type { Type } from './types';
+import { getModuleMetadata, Module } from './decorators/module.decorator';
 import { AerieConfig } from './aerie-config';
+import { AerieCommonModule } from './common/common.module';
 
 export class AppBootstrap {
   private static instance: AppBootstrap;
   private router: Router;
-  private registeredModules = new Set<Constructor>();
+  private registeredModules = new Set<Type>();
   private isInitialized = false;
 
   private constructor(private readonly config: AerieConfig) {
@@ -25,12 +26,31 @@ export class AppBootstrap {
       return this;
     }
 
-    this.registerModule(this.config.rootModule);
+    // Register the root module with AerieCommonModule automatically imported
+    const rootMetadata = getModuleMetadata(this.config.rootModule);
+    if (!rootMetadata) {
+      throw new Error(
+        `Root module ${this.config.rootModule.name} is not decorated with @Module`
+      );
+    }
+
+    // Create a new module that extends the root module and includes AerieCommonModule
+    @Module({
+      imports: [...(rootMetadata.imports || []), AerieCommonModule],
+      providers: rootMetadata.providers || [],
+      controllers:
+        rootMetadata.apiControllers?.concat(
+          rootMetadata.viewControllers || []
+        ) || [],
+    })
+    class EnhancedRootModule extends this.config.rootModule {}
+
+    this.registerModule(EnhancedRootModule);
     this.isInitialized = true;
     return this;
   }
 
-  private registerModule(moduleClass: Constructor) {
+  private registerModule(moduleClass: Type) {
     if (this.registeredModules.has(moduleClass)) {
       return this;
     }

@@ -1,23 +1,23 @@
 /// <reference types="reflect-metadata" />
 import 'reflect-metadata';
-import type { Constructor } from '../types';
+import type { Type } from '../types';
 import { getControllerMetadata } from './http.decorator';
 
 export const MODULE_METADATA_KEY = Symbol('MODULE');
 
 export type ModuleOptions = {
-  imports?: Constructor[];
-  controllers?: Constructor[];
-  providers?: Constructor[];
-  exports?: Constructor[];
+  imports?: Type[];
+  controllers?: Type[];
+  providers?: Type[];
+  exports?: Type[];
 };
 
 export type ModuleMetadata = {
-  imports?: Constructor[];
-  apiControllers: Constructor[];
-  viewControllers: Constructor[];
-  providers?: Constructor[];
-  exports?: Constructor[];
+  imports?: Type[];
+  apiControllers: Type[];
+  viewControllers: Type[];
+  providers?: Type[];
+  exports?: Type[];
 };
 
 export function Module(options: ModuleOptions) {
@@ -25,8 +25,8 @@ export function Module(options: ModuleOptions) {
     console.log('Applying Module decorator to:', target.name);
 
     // Split controllers into api and view controllers
-    const apiControllers: Constructor[] = [];
-    const viewControllers: Constructor[] = [];
+    const apiControllers: Type[] = [];
+    const viewControllers: Type[] = [];
 
     if (options.controllers) {
       for (const controller of options.controllers) {

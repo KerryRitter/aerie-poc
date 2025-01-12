@@ -1,5 +1,5 @@
-import { Constructor } from './types';
+import { Type } from './types';
 
 export type AerieConfig = {
-  rootModule: Constructor;
+  rootModule: Type;
 };

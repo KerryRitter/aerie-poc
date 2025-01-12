@@ -15,9 +15,10 @@ import { getParamsMetadata } from './decorators/http-params.decorator';
 import { getControllerMetadata } from './decorators/http.decorator';
 import type { RouteMetadata } from './decorators/types';
 import { ModuleLoader } from './module-loader';
-import type { Constructor } from './types';
+import type { Type } from './types';
 import { bootstrap } from './bootstrap';
 import { AerieConfig } from './aerie-config';
+import { PipeTransform } from './pipes';
 
 type ModuleRoute = {
   path: string;
@@ -61,7 +62,7 @@ export class Router {
     return this.container;
   }
 
-  registerController(controllerClass: Constructor) {
+  registerController(controllerClass: Type) {
     const controllerMetadata = getControllerMetadata(controllerClass);
     if (!controllerMetadata) {
       console.log('No controller metadata for:', controllerClass.name);
@@ -158,7 +159,31 @@ export class Router {
     return undefined;
   }
 
-  private createRouteHandler(controllerClass: Constructor): ViewHandler {
+  private async transformValue(
+    value: any,
+    pipes: (Type<PipeTransform> | PipeTransform)[],
+    metadata: any
+  ) {
+    let transformedValue = value;
+
+    for (const pipe of pipes) {
+      const pipeInstance = this.isPipeInstance(pipe)
+        ? pipe
+        : this.container.resolve(pipe);
+      transformedValue = await pipeInstance.transform(
+        transformedValue,
+        metadata
+      );
+    }
+
+    return transformedValue;
+  }
+
+  private isPipeInstance(pipe: any): pipe is PipeTransform {
+    return typeof pipe === 'object' && 'transform' in pipe;
+  }
+
+  private createRouteHandler(controllerClass: Type): ViewHandler {
     const metadata = getControllerMetadata(controllerClass);
     if (!metadata) {
       throw new Error(`${controllerClass.name} is not a valid controller`);
@@ -175,11 +200,6 @@ export class Router {
         const path =
           url.pathname.replace(metadata.path, '').replace(/^\/+|\/+$/g, '') ||
           '/';
-        console.log('Loader path matching:', {
-          url: url.pathname,
-          controllerPath: metadata.path,
-          matchPath: path,
-        });
 
         const entries = Array.from(metadata.routes.entries()) as Array<
           [string | symbol, RouteMetadata]
@@ -187,63 +207,58 @@ export class Router {
         const methodEntry = entries.find(([_, route]) => {
           const matches =
             route.method === 'GET' && this.matchRoute(route.path || '/', path);
-          console.log('Checking route match:', {
-            method: route.method,
-            routePath: route.path || '/',
-            requestPath: path,
-            matches,
-          });
           return matches;
         });
 
         if (!methodEntry) {
-          console.log('No matching GET route found');
           return null;
         }
 
         const [method, routeMetadata] = methodEntry;
-        console.log('Found matching route:', {
-          method: String(method),
-          metadata: routeMetadata,
-        });
-
         const handlerFn = controller[method as string];
         if (!handlerFn) {
           throw new Error('No GET handler method found');
         }
 
-        // Parse params using matchPath
         const fullPattern = ['', metadata.path, routeMetadata.path]
           .filter(Boolean)
           .join('/')
           .replace(/\/+/g, '/');
 
-        console.log('Matching full pattern:', {
-          pattern: fullPattern,
-          pathname: url.pathname,
-        });
         const match = matchPath({ path: fullPattern, end: true }, url.pathname);
-        console.log('Match result:', match);
-
         const paramMetadata = getParamsMetadata(controller, method);
+
         const args = await Promise.all(
           paramMetadata.map(async (param) => {
+            let value;
             switch (param.type) {
               case 'PARAM':
-                return param.data ? match?.params[param.data] || null : null;
+                value = param.data ? match?.params[param.data] || null : null;
+                break;
               case 'QUERY':
-                return param.data
+                value = param.data
                   ? url.searchParams.get(param.data)
                   : Object.fromEntries(url.searchParams);
+                break;
               default:
-                return undefined;
+                value = undefined;
             }
+
+            // Transform value through pipes if they exist
+            if (param.pipes && param.pipes.length > 0) {
+              value = await this.transformValue(value, param.pipes, {
+                type: param.type.toLowerCase(),
+                metatype: param.metatype,
+                data: param.data,
+              });
+            }
+
+            return value;
           })
         );
 
         const result = await Reflect.apply(handlerFn, controller, args);
 
-        // For API controllers, return the result directly
         if (metadata.type === 'api') {
           return json(result);
         }

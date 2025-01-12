@@ -1,17 +1,23 @@
 import 'reflect-metadata';
+import { PipeTransform } from '../pipes';
+import { Type } from '../types';
 
 const PARAMS_METADATA_KEY = Symbol('PARAMS_METADATA');
 
 type ParamType = 'PARAM' | 'BODY' | 'QUERY' | 'HEADERS' | 'SESSION' | 'IP';
 
+type ParamPipe = Type<PipeTransform> | PipeTransform;
+
 type ParamMetadata = {
   index: number;
   type: ParamType;
   data?: string;
+  pipes?: ParamPipe[];
+  metatype?: Type;
 };
 
 function createParamDecorator(type: ParamType) {
-  return function (data?: string) {
+  return function (data?: string | ParamPipe, ...pipes: ParamPipe[]) {
     return function (
       target: object,
       propertyKey: string | symbol,
@@ -22,10 +28,30 @@ function createParamDecorator(type: ParamType) {
       const existingParams: ParamMetadata[] =
         Reflect.getMetadata(PARAMS_METADATA_KEY, target, propertyKey) || [];
 
+      const types = Reflect.getMetadata(
+        'design:paramtypes',
+        target,
+        propertyKey
+      );
+      const metatype = types?.[parameterIndex];
+
+      // Handle case where first argument is a pipe
+      let paramData: string | undefined;
+      let paramPipes: ParamPipe[] = [];
+
+      if (typeof data === 'string') {
+        paramData = data;
+        paramPipes = pipes;
+      } else if (data) {
+        paramPipes = [data, ...pipes];
+      }
+
       existingParams.push({
         index: parameterIndex,
         type,
-        data,
+        data: paramData,
+        pipes: paramPipes,
+        metatype,
       });
 
       Reflect.defineMetadata(

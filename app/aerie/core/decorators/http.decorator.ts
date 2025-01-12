@@ -1,6 +1,6 @@
 import { CONTROLLER_METADATA_KEY, ROUTE_METADATA_KEY } from './keys';
 import type { RouteMetadata, HttpMethod, ControllerType } from './types';
-import type { Constructor } from '../types';
+import type { Type } from '../types';
 import type { ReactElement } from 'react';
 
 // Store routes temporarily until Controller decorator is applied
@@ -43,7 +43,7 @@ export function ViewController(prefix: string = '') {
 }
 
 function createControllerDecorator(prefix: string, type: ControllerType) {
-  return function <T extends Constructor>(target: T) {
+  return function <T extends Type>(target: T) {
     console.log(`Applying ${type} controller decorator to:`, target.name);
 
     // Get any pending routes that were registered before the Controller decorator
@@ -109,7 +109,7 @@ export type ControllerMetadata = {
 };
 
 export function getControllerMetadata(
-  target: Constructor
+  target: Type
 ): ControllerMetadata | undefined {
   return Reflect.getMetadata(CONTROLLER_METADATA_KEY, target);
 }

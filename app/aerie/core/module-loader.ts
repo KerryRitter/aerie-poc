@@ -1,10 +1,10 @@
 import { Container } from './container';
-import type { Constructor } from './types';
+import { Type } from './types';
 
 export class ModuleLoader {
   constructor(private readonly container: Container) {}
 
-  getProvider<T>(token: Constructor<T> | string | symbol): T {
+  getProvider<T>(token: Type<T> | string | symbol): T {
     try {
       // Try to resolve from container first
       return this.container.resolve(token as any);

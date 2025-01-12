@@ -13,6 +13,7 @@ import {
 } from '../../aerie/core/decorators/http-response.decorator';
 import { CatsServerService } from './cats.server-service';
 import type { Cat } from './cats.types';
+import { ParseIntPipe } from '../../aerie/core/pipes';
 
 @ApiController('cats')
 export class CatsApiController {
@@ -31,8 +32,10 @@ export class CatsApiController {
   }
 
   @ApiRoute.Get(':id')
-  async findOne(@Param('id') id: string): Promise<Cat | undefined> {
-    return this.catsService.findOne(parseInt(id));
+  async findOne(
+    @Param('id', ParseIntPipe) id: number
+  ): Promise<Cat | undefined> {
+    return this.catsService.findOne(id);
   }
 
   @ApiRoute.Post()
