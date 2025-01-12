@@ -1,8 +1,6 @@
-import * as React from 'react';
 import {
-  Controller,
-  Json,
-  Loader,
+  ApiController,
+  ApiRoute,
 } from '../../aerie/core/decorators/http.decorator';
 import {
   Body,
@@ -13,25 +11,14 @@ import {
   HttpCode,
   Header,
 } from '../../aerie/core/decorators/http-response.decorator';
-import { CatsServerService } from './cats.service-server';
-import { CatsClientService } from './cats.service-client';
+import { CatsServerService } from './cats.server-service';
 import type { Cat } from './cats.types';
 
-const TestRoute = () => {
-  return <div>Test Route</div>;
-};
-
-@Controller('cats')
-export class CatsController {
+@ApiController('cats')
+export class CatsApiController {
   constructor(private readonly catsService: CatsServerService) {}
 
-  @Loader('test', <TestRoute />)
-  async testLoader() {
-    const cats = await this.catsService.findAll();
-    return { cats };
-  }
-
-  @Json.Get()
+  @ApiRoute.Get()
   @HttpCode(200)
   @Header('Cache-Control', 'max-age=60')
   async findAll(@Query('limit') limit?: string): Promise<Cat[]> {
@@ -43,12 +30,12 @@ export class CatsController {
     return cats;
   }
 
-  @Json.Get(':id')
+  @ApiRoute.Get(':id')
   async findOne(@Param('id') id: string): Promise<Cat | undefined> {
     return this.catsService.findOne(parseInt(id));
   }
 
-  @Json.Post()
+  @ApiRoute.Post()
   @HttpCode(201)
   async create(
     @Body() createCat: Pick<Cat, 'name' | 'age' | 'breed'>
@@ -57,7 +44,7 @@ export class CatsController {
     return newCat;
   }
 
-  @Json.Delete(':id')
+  @ApiRoute.Delete(':id')
   @HttpCode(204)
   async remove(@Param('id') id: string): Promise<void> {
     await this.catsService.delete(parseInt(id));

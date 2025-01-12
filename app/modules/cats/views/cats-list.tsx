@@ -2,15 +2,14 @@ import React, { type ReactElement } from 'react';
 import { useLoaderData } from '@remix-run/react';
 import { useProvider } from '../../../aerie/react/hooks';
 import { useEffect } from 'react';
-import { CatsClientService } from '../cats.service-client';
 import type { Cat } from '../cats.types';
+import { CatsClientService } from '../cats.client-service';
 
 export function CatsList(): ReactElement {
   const cats = useLoaderData<Cat[]>();
   const catsClientService = useProvider(CatsClientService);
 
   useEffect(() => {
-    // Sync server data to client service
     catsClientService.setCats(cats);
   }, [cats, catsClientService]);
 
@@ -26,4 +25,4 @@ export function CatsList(): ReactElement {
       </ul>
     </div>
   );
-} 
+}

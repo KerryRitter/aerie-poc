@@ -1,5 +1,5 @@
 import { CONTROLLER_METADATA_KEY, ROUTE_METADATA_KEY } from './keys';
-import type { RouteMetadata, HttpMethod } from './types';
+import type { RouteMetadata, HttpMethod, ControllerType } from './types';
 import type { Constructor } from '../types';
 import type { ReactElement } from 'react';
 
@@ -9,33 +9,42 @@ const pendingRoutes = new WeakMap<
   Map<string | symbol, RouteMetadata>
 >();
 
-export const Json = {
-  Get: (path: string = '') => createRouteDecorator('GET', path, true),
-  Post: (path: string = '') => createRouteDecorator('POST', path, true),
-  Put: (path: string = '') => createRouteDecorator('PUT', path, true),
-  Patch: (path: string = '') => createRouteDecorator('PATCH', path, true),
-  Delete: (path: string = '') => createRouteDecorator('DELETE', path, true),
+export const ApiRoute = {
+  Get: (path: string = '') => createRouteDecorator('GET', path),
+  Post: (path: string = '') => createRouteDecorator('POST', path),
+  Put: (path: string = '') => createRouteDecorator('PUT', path),
+  Patch: (path: string = '') => createRouteDecorator('PATCH', path),
+  Delete: (path: string = '') => createRouteDecorator('DELETE', path),
 };
 
 export const Action = {
   default: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('POST', path, false, component),
+    createRouteDecorator('POST', path, component),
   Post: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('POST', path, false, component),
+    createRouteDecorator('POST', path, component),
   Put: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('PUT', path, false, component),
+    createRouteDecorator('PUT', path, component),
   Patch: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('PATCH', path, false, component),
+    createRouteDecorator('PATCH', path, component),
   Delete: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('DELETE', path, false, component),
+    createRouteDecorator('DELETE', path, component),
 };
 
 export const Loader = (path: string = '', component?: ReactElement) =>
-  createRouteDecorator('GET', path, false, component);
+  createRouteDecorator('GET', path, component);
 
-export function Controller(prefix: string = '') {
+export function ApiController(prefix: string = '') {
+  const apiPrefix = `/api/${prefix}`.replace(/\/+/g, '/').replace(/\/$/, '');
+  return createControllerDecorator(apiPrefix, 'api');
+}
+
+export function ViewController(prefix: string = '') {
+  return createControllerDecorator(prefix, 'view');
+}
+
+function createControllerDecorator(prefix: string, type: ControllerType) {
   return function <T extends Constructor>(target: T) {
-    console.log('Applying Controller decorator to:', target.name);
+    console.log(`Applying ${type} controller decorator to:`, target.name);
 
     // Get any pending routes that were registered before the Controller decorator
     const routes = pendingRoutes.get(target.prototype) || new Map();
@@ -43,11 +52,13 @@ export function Controller(prefix: string = '') {
     const metadata = {
       path: prefix,
       routes,
+      type,
     };
 
     console.log('Setting controller metadata:', {
       controller: target.name,
       path: prefix,
+      type,
       routes: Array.from(routes.entries()).map(([key, value]) => ({
         key: String(key),
         method: value.method,
@@ -63,7 +74,6 @@ export function Controller(prefix: string = '') {
 function createRouteDecorator(
   method: HttpMethod,
   path: string = '',
-  isJson: boolean = false,
   component?: ReactElement
 ) {
   return function (
@@ -78,14 +88,14 @@ function createRouteDecorator(
       pendingRoutes.set(target, routes);
     }
 
-    routes.set(propertyKey, { method, path, isJson, component });
+    routes.set(propertyKey, { method, path, component });
 
     console.log('Added route:', {
       target: target.constructor.name,
       propertyKey: String(propertyKey),
       method,
       path,
-      isJson,
+      component: !!component,
     });
 
     return descriptor;
@@ -95,6 +105,7 @@ function createRouteDecorator(
 export type ControllerMetadata = {
   path: string;
   routes: Map<string | symbol, RouteMetadata>;
+  type: ControllerType;
 };
 
 export function getControllerMetadata(

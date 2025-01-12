@@ -1,5 +1,4 @@
-import { CatsClientService } from '../../modules/cats/cats.service-client';
-import { CatsServerService } from '../../modules/cats/cats.service-server';
+import { CatsServerService } from '../../modules/cats/cats.server-service';
 import type { Constructor } from './types';
 
 export class Container {

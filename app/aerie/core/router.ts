@@ -35,6 +35,7 @@ type ModuleRoute = {
 type ViewHandler = {
   loader: LoaderFunction;
   action: ActionFunction;
+  component?: ReactElement;
 };
 
 export class Router {
@@ -215,10 +216,10 @@ export class Router {
 
         const result = await Reflect.apply(handlerFn, controller, args);
 
-        if (routeMetadata.isJson) {
-          const statusCode = getHttpCodeMetadata(controller, method) || 200;
-          const headers = getHeadersMetadata(controller, method);
-          return json(result, { status: statusCode, headers });
+        // For API controllers, return the result directly
+        // For view controllers with no component, return null
+        if (metadata.type === 'view' && !routeMetadata.component) {
+          return null;
         }
 
         return result;
@@ -278,14 +279,19 @@ export class Router {
 
         const result = await Reflect.apply(handlerFn, controller, args);
 
-        if (routeMetadata.isJson) {
-          const statusCode = getHttpCodeMetadata(controller, method) || 200;
-          const headers = getHeadersMetadata(controller, method);
-          return json(result, { status: statusCode, headers });
+        // For API controllers, return the result directly
+        // For view controllers with no component, return null
+        if (metadata.type === 'view' && !routeMetadata.component) {
+          return null;
         }
 
         return result;
       },
+      // Only return component for view controllers with a component
+      component:
+        metadata.type === 'view'
+          ? Array.from(metadata.routes.values())[0]?.component
+          : undefined,
     };
   }
 

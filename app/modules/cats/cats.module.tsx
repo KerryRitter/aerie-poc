@@ -1,11 +1,12 @@
 import { Module } from '../../aerie/core/decorators/module.decorator';
-import { CatsServerService } from './cats.service-server';
-import { CatsClientService } from './cats.service-client';
-import { CatsController } from './cats.controller';
+import { CatsServerService } from './cats.server-service';
+import { CatsClientService } from './cats.client-service';
+import { CatsApiController } from './cats.api-controller';
+import { CatsViewController } from './cats.view-controller';
 
 @Module({
-  controllers: [CatsController],
+  controllers: [CatsApiController, CatsViewController],
   providers: [CatsServerService, CatsClientService],
   exports: [CatsServerService, CatsClientService],
 })
-export class CatsModule {} 
+export class CatsModule {}
