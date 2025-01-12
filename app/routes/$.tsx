@@ -1,9 +1,6 @@
 import { Router } from '~/aerie/core/router';
-import { AppModule } from '~/app.module';
-import { bootstrap } from '../aerie/core/bootstrap';
+import { AERIE_CONFIG } from '../aerie.config';
 
-bootstrap().registerModule(AppModule);
-
-const route = Router.getInstance().createRemixViewRoute();
+const route = Router.getInstance(AERIE_CONFIG).createRemixViewRoute();
 export const { loader, action } = route;
 export default route.Component;

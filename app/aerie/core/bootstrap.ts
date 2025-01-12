@@ -1,24 +1,36 @@
 import { Router } from './router';
 import type { Constructor } from './types';
 import { getModuleMetadata } from './decorators/module.decorator';
+import { AerieConfig } from './aerie-config';
 
 export class AppBootstrap {
   private static instance: AppBootstrap;
   private router: Router;
   private registeredModules = new Set<Constructor>();
+  private isInitialized = false;
 
-  private constructor() {
-    this.router = Router.getInstance();
+  private constructor(private readonly config: AerieConfig) {
+    this.router = Router.getInstance(this.config);
   }
 
-  static getInstance(): AppBootstrap {
+  static getInstance(config: AerieConfig): AppBootstrap {
     if (!AppBootstrap.instance) {
-      AppBootstrap.instance = new AppBootstrap();
+      AppBootstrap.instance = new AppBootstrap(config);
     }
     return AppBootstrap.instance;
   }
 
-  registerModule(moduleClass: Constructor) {
+  ensureRootInitialized() {
+    if (this.isInitialized) {
+      return this;
+    }
+
+    this.registerModule(this.config.rootModule);
+    this.isInitialized = true;
+    return this;
+  }
+
+  private registerModule(moduleClass: Constructor) {
     if (this.registeredModules.has(moduleClass)) {
       return this;
     }
@@ -45,16 +57,29 @@ export class AppBootstrap {
       }
     }
 
-    // Register controllers
-    if (metadata.controllers) {
-      for (const controller of metadata.controllers) {
+    // Register API controllers
+    if (metadata.apiControllers) {
+      for (const controller of metadata.apiControllers) {
+        this.router.getContainer().register(controller);
+      }
+    }
+
+    // Register view controllers
+    if (metadata.viewControllers) {
+      for (const controller of metadata.viewControllers) {
         this.router.getContainer().register(controller);
       }
     }
 
     // Now register routes after all controllers are registered
-    if (metadata.controllers) {
-      for (const controller of metadata.controllers) {
+    if (metadata.apiControllers) {
+      for (const controller of metadata.apiControllers) {
+        this.router.registerController(controller);
+      }
+    }
+
+    if (metadata.viewControllers) {
+      for (const controller of metadata.viewControllers) {
         this.router.registerController(controller);
       }
     }
@@ -68,6 +93,6 @@ export class AppBootstrap {
   }
 }
 
-export function bootstrap() {
-  return AppBootstrap.getInstance();
+export function bootstrap(config: AerieConfig) {
+  return AppBootstrap.getInstance(config);
 }

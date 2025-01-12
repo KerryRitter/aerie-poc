@@ -16,6 +16,8 @@ import { getControllerMetadata } from './decorators/http.decorator';
 import type { RouteMetadata } from './decorators/types';
 import { ModuleLoader } from './module-loader';
 import type { Constructor } from './types';
+import { bootstrap } from './bootstrap';
+import { AerieConfig } from './aerie-config';
 
 type ModuleRoute = {
   path: string;
@@ -44,13 +46,13 @@ export class Router {
     new Map();
   private viewRegistry: ViewRegistry = {};
 
-  private constructor() {
+  private constructor(private readonly config: AerieConfig) {
     this.container = Container.getInstance();
   }
 
-  static getInstance(): Router {
+  static getInstance(config: AerieConfig): Router {
     if (!Router.instance) {
-      Router.instance = new Router();
+      Router.instance = new Router(config);
     }
     return Router.instance;
   }
@@ -360,6 +362,8 @@ export class Router {
   }
 
   createRemixViewRoute() {
+    bootstrap(this.config).ensureRootInitialized();
+
     const router = this;
     const moduleLoader = new ModuleLoader(this.container);
 

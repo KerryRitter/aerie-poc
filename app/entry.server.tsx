@@ -14,7 +14,7 @@ import { RemixServer } from '@remix-run/react';
 import { isbot } from 'isbot';
 import { renderToPipeableStream } from 'react-dom/server';
 import { bootstrap } from './aerie/core/bootstrap';
-import { AppModule } from './app.module';
+import { AERIE_CONFIG } from './aerie.config';
 
 const ABORT_DELAY = 5000;
 
@@ -25,7 +25,7 @@ export default function handleRequest(
   remixContext: EntryContext
 ) {
   // Initialize the framework
-  bootstrap().registerModule(AppModule);
+  bootstrap(AERIE_CONFIG).ensureRootInitialized();
 
   return isbot(request.headers.get('user-agent'))
     ? handleBotRequest(
