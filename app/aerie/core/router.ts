@@ -289,7 +289,7 @@ export class Router {
         if (!handler) return null;
         return handler.action(args);
       },
-      Component: () => null,
+      // Component: () => null,
     };
   }
 }

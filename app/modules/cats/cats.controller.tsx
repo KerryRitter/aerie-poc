@@ -23,10 +23,7 @@ const TestRoute = () => {
 
 @Controller('cats')
 export class CatsController {
-  constructor(
-    private readonly catsService: CatsServerService,
-    private readonly catsClientService: CatsClientService
-  ) {}
+  constructor(private readonly catsService: CatsServerService) {}
 
   @Loader('test', <TestRoute />)
   async testLoader() {
@@ -39,8 +36,6 @@ export class CatsController {
   @Header('Cache-Control', 'max-age=60')
   async findAll(@Query('limit') limit?: string): Promise<Cat[]> {
     const cats = await this.catsService.findAll();
-    // Update client-side state
-    this.catsClientService.setCats(cats);
 
     if (limit) {
       return cats.slice(0, parseInt(limit));
@@ -59,8 +54,6 @@ export class CatsController {
     @Body() createCat: Pick<Cat, 'name' | 'age' | 'breed'>
   ): Promise<Cat> {
     const newCat = await this.catsService.create(createCat);
-    // Update client-side state
-    this.catsClientService.addCat(newCat);
     return newCat;
   }
 

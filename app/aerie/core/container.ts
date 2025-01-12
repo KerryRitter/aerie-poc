@@ -1,3 +1,5 @@
+import { CatsClientService } from '../../modules/cats/cats.service-client';
+import { CatsServerService } from '../../modules/cats/cats.service-server';
 import type { Constructor } from './types';
 
 export class Container {
@@ -44,6 +46,8 @@ export class Container {
     const dependencies = paramTypes.map((paramType: Constructor) => {
       return this.resolve(paramType);
     });
+
+    dependencies.push(new CatsServerService());
 
     return new provider(...dependencies);
   }
