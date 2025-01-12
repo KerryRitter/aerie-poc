@@ -1,21 +1,32 @@
-import React, { type ReactElement, useEffect } from 'react';
+import React, { type ReactElement } from 'react';
 import { useLoaderData } from '@remix-run/react';
-import { useProvider } from '../../../aerie/react/hooks';
 import type { Cat } from '../cats.types';
-import { CatsClientService } from '../cats.client-service';
+import { createClientComponent } from '~/aerie/react/create-client-component';
+
+function CatItemFallback({ cat }: { cat: Cat }): ReactElement {
+  return (
+    <li>
+      {cat.name} - {cat.breed} ({cat.age} years old)
+    </li>
+  );
+}
+
+const ClientCatItem = createClientComponent<{ cat: Cat }>(
+  () => import('./cat-item.client'),
+  CatItemFallback
+);
 
 export function CatsList(): ReactElement {
   const { cats } = useLoaderData<{
     cats: Cat[];
   }>();
-  const catsClientService = useProvider(CatsClientService);
 
   return (
     <div>
       <h1>Cats</h1>
       <ul>
         {cats.map((cat) => (
-          <li key={cat.id}>{catsClientService.renderCatLabel(cat)}</li>
+          <ClientCatItem key={cat.id} cat={cat} />
         ))}
       </ul>
     </div>

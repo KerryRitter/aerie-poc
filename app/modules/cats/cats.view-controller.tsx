@@ -10,7 +10,7 @@ import { CatsList } from './views/cats-list';
 export class CatsViewController {
   constructor(private readonly catsService: CatsServerService) {}
 
-  @Loader('test', <CatsList />)
+  @Loader('', <CatsList />)
   async testLoader() {
     const cats = await this.catsService.findAll();
     return { cats };
