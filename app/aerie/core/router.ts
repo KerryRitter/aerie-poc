@@ -6,6 +6,7 @@ import type {
 } from '@remix-run/node';
 import type { Params } from '@remix-run/react';
 import { json } from '@remix-run/node';
+import { matchPath } from '@remix-run/router';
 import { Container } from './container';
 import { getControllerMetadata } from './decorators/http.decorator';
 import { getParamsMetadata } from './decorators/http-params.decorator';
@@ -121,10 +122,10 @@ export class Router {
         name,
         routePath: normalizedRoutePath,
         requestPath: normalizedPath,
-        isMatch: normalizedPath === normalizedRoutePath,
+        isMatch: normalizedPath.startsWith(normalizedRoutePath),
       });
 
-      if (normalizedPath === normalizedRoutePath) {
+      if (normalizedPath.startsWith(normalizedRoutePath)) {
         console.log('Found matching HTTP route:', name);
         return this.createRouteHandler(route.controller);
       }
@@ -160,9 +161,15 @@ export class Router {
           [string | symbol, RouteMetadata]
         >;
         const methodEntry = entries.find(([_, route]) => {
-          return (
-            route.method === 'GET' && this.matchRoute(route.path || '/', path)
-          );
+          const matches =
+            route.method === 'GET' && this.matchRoute(route.path || '/', path);
+          console.log('Checking route match:', {
+            method: route.method,
+            routePath: route.path || '/',
+            requestPath: path,
+            matches,
+          });
+          return matches;
         });
 
         if (!methodEntry) {
@@ -181,12 +188,21 @@ export class Router {
           throw new Error('No GET handler method found');
         }
 
+        // Parse params using matchPath
+        const fullPattern = `/${metadata.path}${routeMetadata.path.startsWith('/') ? '' : '/'}${routeMetadata.path}`;
+        console.log('Matching full pattern:', {
+          pattern: fullPattern,
+          pathname: url.pathname,
+        });
+        const match = matchPath({ path: fullPattern, end: true }, url.pathname);
+        console.log('Match result:', match);
+
         const paramMetadata = getParamsMetadata(controller, method);
         const args = await Promise.all(
           paramMetadata.map(async (param) => {
             switch (param.type) {
               case 'PARAM':
-                return param.data ? params[param.data] || null : null;
+                return param.data ? match?.params[param.data] || null : null;
               case 'QUERY':
                 return param.data
                   ? url.searchParams.get(param.data)
@@ -233,12 +249,21 @@ export class Router {
           throw new Error(`No ${request.method} handler method found`);
         }
 
+        // Parse params using matchPath
+        const fullPattern = `/${metadata.path}${routeMetadata.path.startsWith('/') ? '' : '/'}${routeMetadata.path}`;
+        console.log('Matching full pattern:', {
+          pattern: fullPattern,
+          pathname: url.pathname,
+        });
+        const match = matchPath({ path: fullPattern, end: true }, url.pathname);
+        console.log('Match result:', match);
+
         const paramMetadata = getParamsMetadata(controller, method);
         const args = await Promise.all(
           paramMetadata.map(async (param) => {
             switch (param.type) {
               case 'PARAM':
-                return param.data ? params[param.data] || null : null;
+                return param.data ? match?.params[param.data] || null : null;
               case 'BODY':
                 return request.json();
               case 'QUERY':
