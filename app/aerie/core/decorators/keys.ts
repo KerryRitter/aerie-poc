@@ -1,0 +1,2 @@
+export const CONTROLLER_METADATA_KEY = Symbol('CONTROLLER_METADATA');
+export const ROUTE_METADATA_KEY = Symbol('ROUTE_METADATA'); 
