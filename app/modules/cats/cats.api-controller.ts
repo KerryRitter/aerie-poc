@@ -15,9 +15,12 @@ import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
 import { CatsServerService } from './cats.server-service';
 import type { Cat } from './cats.types';
 import { ParseIntPipe } from '../../aerie/core/pipes';
+import { UseMiddleware } from '~/aerie/core/decorators/middleware.decorator';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 
 @Dependencies(CatsServerService)
 @ApiController('cats')
+@UseMiddleware(new LoggingMiddleware())
 export class CatsApiController {
   constructor(private readonly catsService: CatsServerService) {}
 

@@ -1,4 +1,8 @@
-import { getCurrentEnvironment, EnvironmentError, type RuntimeEnvironment } from './types';
+import {
+  getCurrentEnvironment,
+  EnvironmentError,
+  type RuntimeEnvironment,
+} from './types';
 
 const ENVIRONMENT_METADATA_KEY = Symbol('ENVIRONMENT_METADATA');
 
@@ -9,12 +13,14 @@ type EnvironmentMetadata = {
 function createEnvironmentDecorator(environment: RuntimeEnvironment) {
   return function () {
     return function (target: any) {
-      // Store the environment metadata
-      Reflect.defineMetadata(
-        ENVIRONMENT_METADATA_KEY,
-        { restrictTo: environment },
-        target
-      );
+      // Only store metadata on the server side
+      if (typeof window === 'undefined') {
+        Reflect.defineMetadata(
+          ENVIRONMENT_METADATA_KEY,
+          { restrictTo: environment },
+          target
+        );
+      }
 
       // Create a proxy to check environment on instantiation
       return new Proxy(target, {
@@ -26,7 +32,7 @@ function createEnvironmentDecorator(environment: RuntimeEnvironment) {
               : EnvironmentError.createClientOnlyError(target.name);
           }
           return Reflect.construct(target, args, newTarget);
-        }
+        },
       });
     };
   };
@@ -35,6 +41,12 @@ function createEnvironmentDecorator(environment: RuntimeEnvironment) {
 export const ServerOnly = createEnvironmentDecorator('server');
 export const ClientOnly = createEnvironmentDecorator('client');
 
-export function getEnvironmentMetadata(target: any): EnvironmentMetadata | undefined {
-  return Reflect.getMetadata(ENVIRONMENT_METADATA_KEY, target);
-} 
+export function getEnvironmentMetadata(
+  target: any
+): EnvironmentMetadata | undefined {
+  // Only try to get metadata on the server side
+  if (typeof window === 'undefined') {
+    return Reflect.getMetadata(ENVIRONMENT_METADATA_KEY, target);
+  }
+  return undefined;
+}

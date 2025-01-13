@@ -6,9 +6,12 @@ import {
 import { CatsServerService } from './cats.server-service';
 import { CatsList } from './views/cats-list';
 import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
+import { UseMiddleware } from '~/aerie/core/decorators/middleware.decorator';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 
-@ViewController('cats')
 @Dependencies(CatsServerService)
+@ViewController('cats')
+@UseMiddleware(new LoggingMiddleware())
 export class CatsViewController {
   constructor(private readonly catsService: CatsServerService) {}
 
