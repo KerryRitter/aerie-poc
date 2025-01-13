@@ -537,15 +537,21 @@ export class Router {
     };
   }
 
-  useGlobalMiddleware(...middleware: Middleware[]) {
-    this.globalMiddleware.push(...middleware);
+  useGlobalMiddleware(middleware: Type<Middleware>) {
+    const instance = this.container.resolve(middleware) as Middleware;
+    this.globalMiddleware.push(instance);
+    return this;
   }
 
-  useGlobalGuards(...guards: Guard[]) {
-    this.globalGuards.push(...guards);
+  useGlobalGuards(guard: Type<Guard>) {
+    const instance = this.container.resolve(guard) as Guard;
+    this.globalGuards.push(instance);
+    return this;
   }
 
-  useGlobalInterceptors(...interceptors: Interceptor[]) {
-    this.globalInterceptors.push(...interceptors);
+  useGlobalInterceptors(interceptor: Type<Interceptor>) {
+    const instance = this.container.resolve(interceptor) as Interceptor;
+    this.globalInterceptors.push(instance);
+    return this;
   }
 }

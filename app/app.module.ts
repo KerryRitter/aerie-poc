@@ -11,8 +11,8 @@ import { LoggingInterceptor } from './modules/cats/interceptors/logging.intercep
 export class AppModule {
   constructor(router: Router) {
     // Add global middleware, guards, and interceptors
-    router.useGlobalMiddleware(new LoggingMiddleware());
-    router.useGlobalGuards(new AuthGuard());
-    router.useGlobalInterceptors(new LoggingInterceptor());
+    router.useGlobalMiddleware(LoggingMiddleware);
+    router.useGlobalGuards(AuthGuard);
+    router.useGlobalInterceptors(LoggingInterceptor);
   }
 }
