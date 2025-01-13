@@ -7,6 +7,5 @@ import { CatsViewController } from './cats.view-controller';
 @Module({
   controllers: [CatsApiController, CatsViewController],
   providers: [CatsServerService, CatsClientService],
-  exports: [CatsServerService, CatsClientService],
 })
 export class CatsModule {}

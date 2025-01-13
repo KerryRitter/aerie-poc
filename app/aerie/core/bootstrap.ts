@@ -42,7 +42,6 @@ export class AppBootstrap {
           rootMetadata.viewControllers || []
         ) || [],
       providers: [...(rootMetadata.providers || [])],
-      exports: [...(rootMetadata.exports || [])],
     })
     class EnhancedRootModule extends this.config.rootModule {}
 
