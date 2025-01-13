@@ -88,6 +88,177 @@ export class Router {
     return this.container;
   }
 
+  async handleRequest(request: Request, response: Response) {
+    const url = new URL(request.url);
+    console.log('Handling request:', {
+      url: url.toString(),
+      method: request.method,
+    });
+
+    const route = this.findMatchingRoute(url.pathname, request.method);
+    console.log('Found route:', route);
+
+    if (!route) {
+      console.log('No route found');
+      return null;
+    }
+
+    const params: any[] = []; // You'll need to implement param extraction based on your needs
+
+    if ('method' in route) {
+      console.log('Handling as API route');
+      return this.handleApiRoute(request, response, route, params);
+    } else {
+      console.log('Handling as view route');
+      return this.handleViewRoute(request, response, route, params);
+    }
+  }
+
+  private findMatchingRoute(
+    path: string,
+    method: string
+  ): ApiRoute | ViewRoute | undefined {
+    console.log('Finding route for:', { path, method });
+    console.log('Available routes:', {
+      api: this.apiRoutes,
+      view: this.viewRoutes,
+    });
+
+    // Try to find matching API route
+    const apiRoute = this.apiRoutes.find((r) => {
+      const match = matchPath({ path: r.path, end: true }, path);
+      return match && r.method === method;
+    });
+
+    if (apiRoute) {
+      console.log('Found API route:', apiRoute);
+      return apiRoute;
+    }
+
+    // Try to find matching view route
+    const viewRoute = this.viewRoutes.find((r) => {
+      const match = matchPath({ path: r.path, end: true }, path);
+      return match;
+    });
+
+    console.log('Found view route:', viewRoute);
+    return viewRoute;
+  }
+
+  private async handleApiRoute(
+    request: Request,
+    response: Response,
+    route: ApiRoute,
+    params: any[]
+  ) {
+    const controller = this.container.resolve(route.controller);
+    const result = await this.processRequest(
+      request,
+      response,
+      controller,
+      route.methodName,
+      params
+    );
+    return result;
+  }
+
+  private async handleViewRoute(
+    request: Request,
+    response: Response,
+    route: ViewRoute,
+    params: any[]
+  ) {
+    console.log('handleViewRoute:', { route });
+
+    if (!route.controller || !route.methodName) {
+      console.log('No controller or methodName');
+      return null;
+    }
+
+    const controller = this.container.resolve(route.controller);
+    console.log('Resolved controller:', controller);
+
+    const result = await this.processRequest(
+      request,
+      response,
+      controller,
+      route.methodName,
+      params
+    );
+    console.log('Controller result:', result);
+
+    // For view controllers, return the result with the viewId
+    const viewId = `${route.path}/${route.methodName}`
+      .replace(/\/+/g, '/')
+      .replace(/^\/+|\/+$/g, '');
+    console.log('Generated viewId:', viewId);
+
+    const finalResult = {
+      ...result,
+      __viewId: viewId,
+    };
+    console.log('Final result:', finalResult);
+    return finalResult;
+  }
+
+  private async processRequest(
+    request: Request,
+    response: Response,
+    target: any,
+    methodName: string,
+    params: any[]
+  ) {
+    const middleware = this.getMiddleware(target.constructor, methodName);
+
+    // Create handler function that will be called after middleware
+    const handler = async () => {
+      return target[methodName].apply(target, params);
+    };
+
+    // Execute middleware chain with handler
+    return this.executeMiddleware(middleware, request, response, handler);
+  }
+
+  private getMiddleware(target: any, methodName?: string): Middleware[] {
+    const classMiddleware: Middleware[] =
+      Reflect.getMetadata(MIDDLEWARE_METADATA, target) || [];
+    const methodMiddleware: Middleware[] = methodName
+      ? Reflect.getMetadata(MIDDLEWARE_METADATA, target, methodName) || []
+      : [];
+
+    return [...classMiddleware, ...methodMiddleware];
+  }
+
+  private executeMiddleware(
+    middleware: Middleware[],
+    request: Request,
+    response: Response,
+    handler: () => Promise<any>
+  ): Promise<any> {
+    // If no middleware, just run the handler
+    if (middleware.length === 0) {
+      return handler();
+    }
+
+    let index = 0;
+
+    const next = async (): Promise<any> => {
+      if (index >= middleware.length) {
+        return handler();
+      }
+
+      const current = middleware[index++];
+
+      if (typeof current === 'function') {
+        return current(request, response, next);
+      } else {
+        return current.use(request, response, next);
+      }
+    };
+
+    return next();
+  }
+
   registerController(controllerClass: Type) {
     const metadata = getControllerMetadata(controllerClass);
     if (!metadata) {
@@ -205,177 +376,6 @@ export class Router {
           route.children
         );
       }
-    }
-  }
-
-  private async executeMiddleware(
-    middleware: Middleware[],
-    request: Request,
-    response: Response,
-    handler: () => Promise<any>
-  ): Promise<any> {
-    // If no middleware, just run the handler
-    if (middleware.length === 0) {
-      return handler();
-    }
-
-    let index = 0;
-
-    const next = async (): Promise<any> => {
-      if (index >= middleware.length) {
-        return handler();
-      }
-
-      const current = middleware[index++];
-
-      if (typeof current === 'function') {
-        return current(request, response, next);
-      } else {
-        return current.use(request, response, next);
-      }
-    };
-
-    return next();
-  }
-
-  private getMiddleware(target: any, methodName?: string): Middleware[] {
-    const classMiddleware: Middleware[] =
-      Reflect.getMetadata(MIDDLEWARE_METADATA, target) || [];
-    const methodMiddleware: Middleware[] = methodName
-      ? Reflect.getMetadata(MIDDLEWARE_METADATA, target, methodName) || []
-      : [];
-
-    return [...classMiddleware, ...methodMiddleware];
-  }
-
-  private async processRequest(
-    request: Request,
-    response: Response,
-    target: any,
-    methodName: string,
-    params: any[]
-  ) {
-    const middleware = this.getMiddleware(target.constructor, methodName);
-
-    // Create handler function that will be called after middleware
-    const handler = async () => {
-      return target[methodName].apply(target, params);
-    };
-
-    // Execute middleware chain with handler
-    return this.executeMiddleware(middleware, request, response, handler);
-  }
-
-  private findMatchingRoute(
-    path: string,
-    method: string
-  ): ApiRoute | ViewRoute | undefined {
-    console.log('Finding route for:', { path, method });
-    console.log('Available routes:', {
-      api: this.apiRoutes,
-      view: this.viewRoutes,
-    });
-
-    // Try to find matching API route
-    const apiRoute = this.apiRoutes.find((r) => {
-      const match = matchPath({ path: r.path, end: true }, path);
-      return match && r.method === method;
-    });
-
-    if (apiRoute) {
-      console.log('Found API route:', apiRoute);
-      return apiRoute;
-    }
-
-    // Try to find matching view route
-    const viewRoute = this.viewRoutes.find((r) => {
-      const match = matchPath({ path: r.path, end: true }, path);
-      return match;
-    });
-
-    console.log('Found view route:', viewRoute);
-    return viewRoute;
-  }
-
-  private async handleApiRoute(
-    request: Request,
-    response: Response,
-    route: ApiRoute,
-    params: any[]
-  ) {
-    const controller = this.container.resolve(route.controller);
-    const result = await this.processRequest(
-      request,
-      response,
-      controller,
-      route.methodName,
-      params
-    );
-    return result;
-  }
-
-  private async handleViewRoute(
-    request: Request,
-    response: Response,
-    route: ViewRoute,
-    params: any[]
-  ) {
-    console.log('handleViewRoute:', { route });
-
-    if (!route.controller || !route.methodName) {
-      console.log('No controller or methodName');
-      return null;
-    }
-
-    const controller = this.container.resolve(route.controller);
-    console.log('Resolved controller:', controller);
-
-    const result = await this.processRequest(
-      request,
-      response,
-      controller,
-      route.methodName,
-      params
-    );
-    console.log('Controller result:', result);
-
-    // For view controllers, return the result with the viewId
-    const viewId = `${route.path}/${route.methodName}`
-      .replace(/\/+/g, '/')
-      .replace(/^\/+|\/+$/g, '');
-    console.log('Generated viewId:', viewId);
-
-    const finalResult = {
-      ...result,
-      __viewId: viewId,
-    };
-    console.log('Final result:', finalResult);
-    return finalResult;
-  }
-
-  async handleRequest(request: Request, response: Response) {
-    const url = new URL(request.url);
-    console.log('Handling request:', {
-      url: url.toString(),
-      method: request.method,
-    });
-
-    const route = this.findMatchingRoute(url.pathname, request.method);
-    console.log('Found route:', route);
-
-    if (!route) {
-      console.log('No route found');
-      return null;
-    }
-
-    const params: any[] = []; // You'll need to implement param extraction based on your needs
-
-    if ('method' in route) {
-      console.log('Handling as API route');
-      return this.handleApiRoute(request, response, route, params);
-    } else {
-      console.log('Handling as view route');
-      return this.handleViewRoute(request, response, route, params);
     }
   }
 

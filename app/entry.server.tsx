@@ -18,15 +18,18 @@ import { AERIE_CONFIG } from './aerie.config';
 
 const ABORT_DELAY = 5000;
 
+// Initialize the framework once at startup
+console.log('Initializing Aerie framework...');
+const app = bootstrap(AERIE_CONFIG);
+app.ensureRootInitialized();
+console.log('Aerie framework initialized.');
+
 export default function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  // Initialize the framework
-  bootstrap(AERIE_CONFIG).ensureRootInitialized();
-
   return isbot(request.headers.get('user-agent'))
     ? handleBotRequest(
         request,
