@@ -17,7 +17,6 @@ export class SqliteDbDialect<TSchema extends Record<string, unknown>>
     }
 
     try {
-      // @ts-expect-error - Dynamic import will be resolved at runtime
       const sqlite = await import('better-sqlite3');
       const { drizzle } = await import('drizzle-orm/better-sqlite3');
 

@@ -33,7 +33,7 @@ export class MySqlDbDialect<TSchema extends Record<string, unknown>>
         import('drizzle-orm/mysql2'),
       ]);
 
-      const connection = await mysql.createConnection({
+      const pool = mysql.createPool({
         uri: config.url,
         host: config.host,
         port: config.port,
@@ -42,12 +42,15 @@ export class MySqlDbDialect<TSchema extends Record<string, unknown>>
         database: config.database,
       });
 
-      const orm = drizzle(connection, {
+      const orm = drizzle(pool, {
         schema: config.schema,
         mode: 'default',
       });
+
       const qb = new Kysely<TSchema>({
-        dialect: new MysqlDialect({ pool: connection }),
+        dialect: new MysqlDialect({
+          pool,
+        }),
       });
 
       return { orm, qb };
