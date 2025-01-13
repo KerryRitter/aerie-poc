@@ -6,11 +6,13 @@ import {
   Type,
   Guard,
   ExecutionContext,
+  Interceptor,
 } from './types';
 import {
   MIDDLEWARE_METADATA,
   ROUTES_METADATA,
   GUARDS_METADATA,
+  INTERCEPTORS_METADATA,
 } from './reflect';
 import { ReactElement } from 'react';
 import { LoaderFunction, ActionFunction, redirect } from '@remix-run/node';
@@ -243,11 +245,26 @@ export class Router {
       }
     }
 
-    // Then process middleware
+    // Then process middleware and interceptors
     const middleware = this.getMiddleware(target.constructor, methodName);
-    return this.executeMiddleware(middleware, request, response, () =>
-      target[methodName].apply(target, params)
+    const interceptors = this.getInterceptors(target.constructor, methodName);
+
+    // Create the final handler that includes middleware and the actual method
+    const handler = async () => {
+      return this.executeMiddleware(middleware, request, response, () =>
+        target[methodName].apply(target, params)
+      );
+    };
+
+    // Chain interceptors
+    const chainedHandler = interceptors.reduceRight(
+      (next, interceptor) => ({
+        handle: () => interceptor.intercept(context, next),
+      }),
+      { handle: handler }
     );
+
+    return chainedHandler.handle();
   }
 
   private getGuards(target: any, methodName?: string): Guard[] {
@@ -298,6 +315,16 @@ export class Router {
     };
 
     return next();
+  }
+
+  private getInterceptors(target: any, methodName?: string): Interceptor[] {
+    const classInterceptors: Interceptor[] =
+      Reflect.getMetadata(INTERCEPTORS_METADATA, target) || [];
+    const methodInterceptors: Interceptor[] = methodName
+      ? Reflect.getMetadata(INTERCEPTORS_METADATA, target, methodName) || []
+      : [];
+
+    return [...classInterceptors, ...methodInterceptors];
   }
 
   registerController(controllerClass: Type) {

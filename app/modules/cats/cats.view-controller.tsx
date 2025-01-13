@@ -9,12 +9,15 @@ import { UseMiddleware } from '../../aerie/core/decorators/middleware.decorator'
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { UseGuards } from '../../aerie/core/decorators/guards.decorator';
 import { AuthGuard } from './guards/auth.guard';
+import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decorator';
+import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { CatsList } from './views/cats-list';
 
 @Dependencies(CatsServerService)
 @ViewController('cats')
 @UseMiddleware(new LoggingMiddleware())
 @UseGuards(AuthGuard)
+@UseInterceptors(LoggingInterceptor)
 export class CatsViewController {
   constructor(private readonly catsService: CatsServerService) {}
 

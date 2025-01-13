@@ -24,3 +24,11 @@ export type ExecutionContext = {
 export type Guard = {
   canActivate(context: ExecutionContext): boolean | Promise<boolean>;
 };
+
+export type CallHandler = {
+  handle(): Promise<any>;
+};
+
+export type Interceptor = {
+  intercept(context: ExecutionContext, next: CallHandler): Promise<any>;
+};
