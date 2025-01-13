@@ -4,7 +4,7 @@ import {
   ViewController,
   Loader,
 } from '../../aerie/core/decorators/http.decorator';
-import { CatsServerService } from './cats.server-service';
+import { CatsService } from './cats.service';
 import { UseMiddleware } from '../../aerie/core/decorators/middleware.decorator';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { UseGuards } from '../../aerie/core/decorators/guards.decorator';
@@ -13,13 +13,13 @@ import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decora
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { CatsList } from './views/cats-list';
 
-@Dependencies(CatsServerService)
+@Dependencies(CatsService)
 @ViewController('cats')
 @UseMiddleware(LoggingMiddleware)
 @UseGuards(AuthGuard)
 @UseInterceptors(LoggingInterceptor)
 export class CatsViewController {
-  constructor(private readonly catsService: CatsServerService) {}
+  constructor(private readonly catsService: CatsService) {}
 
   @Loader('', <CatsList />)
   async index() {

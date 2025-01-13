@@ -1,29 +1,66 @@
-import { Router } from './router';
 import type { Type } from './types';
-import { getModuleMetadata, Module } from './decorators/module.decorator';
 import { AerieConfig } from './aerie-config';
+import { Router } from './router';
+import { getModuleMetadata, Module } from './decorators/module.decorator';
 import { AerieCommonModule } from './common/common.module';
+import { DbService } from './db';
+import { Container } from './container';
 
 export class AppBootstrap {
   private static instance: AppBootstrap;
+  private isInitialized = false;
+  private config: AerieConfig;
   private router: Router;
   private registeredModules = new Set<Type>();
-  private isInitialized = false;
 
-  private constructor(private readonly config: AerieConfig) {
+  static async initializeRoot<TModule extends Type>(
+    rootModule: TModule,
+    config: Omit<Partial<AerieConfig>, 'rootModule'> = {}
+  ) {
+    const app = this.getInstance({
+      rootModule,
+      ...config,
+    });
+    await app.ensureRootInitialized();
+    return app;
+  }
+
+  static getInstance(config: Partial<AerieConfig>) {
+    if (!this.instance) {
+      this.instance = new AppBootstrap(config);
+    }
+    return this.instance;
+  }
+
+  private constructor(config: Partial<AerieConfig>) {
+    // Create and store the config instance first
+    const configInstance = AerieConfig.initialize(config);
+
+    // Register the actual instance in the container before anything else
+    const container = Container.getInstance();
+    container.register(AerieConfig);
+    container.setInstance(AerieConfig, configInstance);
+
+    // Now initialize router with our config
+    this.config = configInstance;
     this.router = Router.getInstance(this.config);
   }
 
-  static getInstance(config: AerieConfig): AppBootstrap {
-    if (!AppBootstrap.instance) {
-      AppBootstrap.instance = new AppBootstrap(config);
-    }
-    return AppBootstrap.instance;
-  }
-
-  ensureRootInitialized() {
+  async ensureRootInitialized() {
     if (this.isInitialized) {
       return this;
+    }
+
+    // Register AerieCommonModule first to ensure core services are available
+    await this.registerModule(AerieCommonModule);
+
+    // Initialize DbService if needed
+    if (this.config.database.dialect !== 'none') {
+      console.log('Initializing DB with config:', this.config.database);
+      const dbService = this.router
+        .getContainer()
+        .resolve<DbService<any>>(DbService);
+      await dbService.initializeConnection();
     }
 
     // Register the root module with AerieCommonModule automatically imported
@@ -34,9 +71,9 @@ export class AppBootstrap {
       );
     }
 
-    // Create a new module that extends the root module and includes AerieCommonModule
+    // Create a new module that extends the root module
     @Module({
-      imports: [...(rootMetadata.imports || []), AerieCommonModule],
+      imports: [...(rootMetadata.imports || [])],
       controllers:
         rootMetadata.apiControllers?.concat(
           rootMetadata.viewControllers || []
@@ -45,12 +82,12 @@ export class AppBootstrap {
     })
     class EnhancedRootModule extends this.config.rootModule {}
 
-    this.registerModule(EnhancedRootModule);
+    await this.registerModule(EnhancedRootModule);
     this.isInitialized = true;
     return this;
   }
 
-  private registerModule(moduleClass: Type) {
+  private async registerModule(moduleClass: Type) {
     if (this.registeredModules.has(moduleClass)) {
       return this;
     }
@@ -66,7 +103,7 @@ export class AppBootstrap {
     // Register imports first
     if (metadata.imports) {
       for (const importedModule of metadata.imports) {
-        this.registerModule(importedModule);
+        await this.registerModule(importedModule);
       }
     }
 

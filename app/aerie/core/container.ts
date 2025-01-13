@@ -121,4 +121,9 @@ export class Container {
     }
     return token.name;
   }
+
+  setInstance<T>(token: InjectToken, instance: T) {
+    const key = this.getProviderKey(token);
+    this.instances.set(key, instance);
+  }
 }

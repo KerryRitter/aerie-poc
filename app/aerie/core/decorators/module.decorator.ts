@@ -9,6 +9,7 @@ export type ModuleOptions = {
   imports?: Type[];
   controllers?: Type[];
   providers?: Type[];
+  exports?: Type[];
 };
 
 export type ModuleMetadata = {
@@ -16,6 +17,7 @@ export type ModuleMetadata = {
   apiControllers: Type[];
   viewControllers: Type[];
   providers?: Type[];
+  exports?: Type[];
 };
 
 export function Module(options: ModuleOptions) {

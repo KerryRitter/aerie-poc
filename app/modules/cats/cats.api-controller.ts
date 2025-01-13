@@ -12,28 +12,28 @@ import {
   Header,
 } from '../../aerie/core/decorators/http-response.decorator';
 import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
-import { CatsServerService } from './cats.server-service';
+import { CatsService } from './cats.service';
 import type { Cat } from './cats.types';
 import { ParseIntPipe } from '../../aerie/core/pipes';
-import { UseMiddleware } from '~/aerie/core/decorators/middleware.decorator';
+import { UseMiddleware } from '../../aerie/core/decorators/middleware.decorator';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { UseGuards } from '../../aerie/core/decorators/guards.decorator';
 import { AuthGuard } from './guards/auth.guard';
 import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decorator';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 
-@Dependencies(CatsServerService)
+@Dependencies(CatsService)
 @ApiController('cats')
 @UseMiddleware(LoggingMiddleware)
 @UseGuards(AuthGuard)
 @UseInterceptors(LoggingInterceptor)
 export class CatsApiController {
-  constructor(private readonly catsService: CatsServerService) {}
+  constructor(private readonly catsService: CatsService) {}
 
   @ApiRoute.Get()
   @HttpCode(200)
   @Header('Cache-Control', 'max-age=60')
-  async findAll(@Query('limit') limit?: string): Promise<Cat[]> {
+  async findAll(@Query('limit') limit?: string) {
     const cats = await this.catsService.findAll();
 
     if (limit) {
@@ -43,25 +43,28 @@ export class CatsApiController {
   }
 
   @ApiRoute.Get(':id')
-  async findOne(
-    @Param('id', ParseIntPipe) id: number
-  ): Promise<Cat | undefined> {
+  async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.catsService.findOne(id);
   }
 
   @ApiRoute.Post()
   @HttpCode(201)
-  async create(
-    @Body() createCat: Pick<Cat, 'name' | 'age' | 'breed'>
-  ): Promise<Cat> {
-    const newCat = await this.catsService.create(createCat);
-    return newCat;
+  async create(@Body() createCat: Omit<Cat, 'id' | 'createdAt'>) {
+    return this.catsService.create(createCat);
+  }
+
+  @ApiRoute.Put(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateCat: Partial<Omit<Cat, 'id' | 'createdAt'>>
+  ) {
+    return this.catsService.update(id, updateCat);
   }
 
   @ApiRoute.Delete(':id')
   @HttpCode(204)
-  async remove(@Param('id') id: string): Promise<void> {
-    await this.catsService.delete(parseInt(id));
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    await this.catsService.delete(id);
     return;
   }
 }
