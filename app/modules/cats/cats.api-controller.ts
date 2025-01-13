@@ -17,10 +17,13 @@ import type { Cat } from './cats.types';
 import { ParseIntPipe } from '../../aerie/core/pipes';
 import { UseMiddleware } from '~/aerie/core/decorators/middleware.decorator';
 import { LoggingMiddleware } from './middleware/logging.middleware';
+import { UseGuards } from '../../aerie/core/decorators/guards.decorator';
+import { AuthGuard } from './guards/auth.guard';
 
 @Dependencies(CatsServerService)
 @ApiController('cats')
 @UseMiddleware(new LoggingMiddleware())
+@UseGuards(AuthGuard)
 export class CatsApiController {
   constructor(private readonly catsService: CatsServerService) {}
 

@@ -1,9 +1,19 @@
 import { AerieConfig } from './aerie-config';
 import { PipeTransform } from './pipes';
-import { Middleware, NextFunction, Type } from './types';
-import { MIDDLEWARE_METADATA, ROUTES_METADATA } from './reflect';
+import {
+  Middleware,
+  NextFunction,
+  Type,
+  Guard,
+  ExecutionContext,
+} from './types';
+import {
+  MIDDLEWARE_METADATA,
+  ROUTES_METADATA,
+  GUARDS_METADATA,
+} from './reflect';
 import { ReactElement } from 'react';
-import { LoaderFunction, ActionFunction } from '@remix-run/node';
+import { LoaderFunction, ActionFunction, redirect } from '@remix-run/node';
 import { Container } from './container';
 import * as React from 'react';
 import { useLocation } from '@remix-run/react';
@@ -20,6 +30,7 @@ type RouteParam = {
 };
 
 type ViewRoute = {
+  type: 'view';
   path: string;
   layout: string;
   controller?: Type;
@@ -33,6 +44,7 @@ type ViewRoute = {
 };
 
 type ApiRoute = {
+  type: 'api';
   path: string;
   method: string;
   controller: Type;
@@ -208,15 +220,44 @@ export class Router {
     methodName: string,
     params: any[]
   ) {
-    const middleware = this.getMiddleware(target.constructor, methodName);
-
-    // Create handler function that will be called after middleware
-    const handler = async () => {
-      return target[methodName].apply(target, params);
+    // Check guards first
+    const guards = this.getGuards(target.constructor, methodName);
+    const context: ExecutionContext = {
+      request,
+      response,
+      type:
+        this.findMatchingRoute(new URL(request.url).pathname, request.method)
+          ?.type === 'api'
+          ? 'api'
+          : 'view',
     };
 
-    // Execute middleware chain with handler
-    return this.executeMiddleware(middleware, request, response, handler);
+    for (const guard of guards) {
+      const canActivate = await guard.canActivate(context);
+      if (!canActivate) {
+        if (context.type === 'api') {
+          return { statusCode: 401, message: 'Unauthorized' };
+        } else {
+          throw redirect(this.config.viewGuardRedirect || 'auth/login');
+        }
+      }
+    }
+
+    // Then process middleware
+    const middleware = this.getMiddleware(target.constructor, methodName);
+    return this.executeMiddleware(middleware, request, response, () =>
+      target[methodName].apply(target, params)
+    );
+  }
+
+  private getGuards(target: any, methodName?: string): Guard[] {
+    const classGuards: Guard[] =
+      Reflect.getMetadata(GUARDS_METADATA, target) || [];
+    const methodGuards: Guard[] = methodName
+      ? Reflect.getMetadata(GUARDS_METADATA, target, methodName) || []
+      : [];
+
+    return [...classGuards, ...methodGuards];
   }
 
   private getMiddleware(target: any, methodName?: string): Middleware[] {
@@ -326,6 +367,7 @@ export class Router {
     params: RouteParam[]
   ) {
     this.apiRoutes.push({
+      type: 'api',
       path,
       method,
       controller,
@@ -347,6 +389,7 @@ export class Router {
     }>
   ) {
     this.viewRoutes.push({
+      type: 'view',
       path,
       layout,
       controller,

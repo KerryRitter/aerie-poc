@@ -14,3 +14,13 @@ export type RouteInfo = {
   path: string;
   method: string;
 };
+
+export type ExecutionContext = {
+  request: Request;
+  response: Response;
+  type: 'api' | 'view';
+};
+
+export type Guard = {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean>;
+};
