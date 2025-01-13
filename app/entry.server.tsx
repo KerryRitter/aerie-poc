@@ -13,16 +13,8 @@ import {
 import { RemixServer } from '@remix-run/react';
 import { isbot } from 'isbot';
 import { renderToPipeableStream } from 'react-dom/server';
-import { AERIE_CONFIG } from './aerie.config';
-import { bootstrap } from './aerie/core/bootstrap';
 
 const ABORT_DELAY = 5000;
-
-// Initialize the framework once at startup
-console.log('Initializing Aerie framework...');
-const app = bootstrap(AERIE_CONFIG);
-app.ensureRootInitialized();
-console.log('Aerie framework initialized.');
 
 export default function handleRequest(
   request: Request,
@@ -76,6 +68,7 @@ function handleBotRequest(
         },
         onError(error: unknown) {
           didError = true;
+
           console.error(error);
         },
       }
@@ -111,11 +104,12 @@ function handleBrowserRequest(
 
           pipe(body);
         },
-        onShellError(error: unknown) {
-          reject(error);
+        onShellError(err: unknown) {
+          reject(err);
         },
         onError(error: unknown) {
           didError = true;
+
           console.error(error);
         },
       }

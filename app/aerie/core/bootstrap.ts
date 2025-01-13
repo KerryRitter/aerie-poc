@@ -111,10 +111,12 @@ export class AppBootstrap {
   getRouter() {
     return this.router;
   }
-}
 
-export function bootstrap(config: AerieConfig) {
-  const instance = AppBootstrap.getInstance(config);
-  instance.ensureRootInitialized();
-  return instance;
+  createRemixApiRoute() {
+    return this.router.createRemixApiRoute();
+  }
+
+  createRemixViewRoute() {
+    return this.router.createRemixViewRoute();
+  }
 }

@@ -1,5 +1,3 @@
-import { Router } from '~/aerie/core/router';
-import { AERIE_CONFIG } from '~/aerie.config';
+import { createRemixApiRoute } from '~/init';
 
-export const { loader, action } =
-  Router.getInstance(AERIE_CONFIG).createRemixApiRoute();
+export const { loader, action } = createRemixApiRoute();
