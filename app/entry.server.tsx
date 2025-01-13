@@ -13,8 +13,8 @@ import {
 import { RemixServer } from '@remix-run/react';
 import { isbot } from 'isbot';
 import { renderToPipeableStream } from 'react-dom/server';
-import { bootstrap } from './aerie/core/bootstrap';
 import { AERIE_CONFIG } from './aerie.config';
+import { bootstrap } from './aerie/core/bootstrap';
 
 const ABORT_DELAY = 5000;
 

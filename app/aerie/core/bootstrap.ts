@@ -114,5 +114,7 @@ export class AppBootstrap {
 }
 
 export function bootstrap(config: AerieConfig) {
-  return AppBootstrap.getInstance(config);
+  const instance = AppBootstrap.getInstance(config);
+  instance.ensureRootInitialized();
+  return instance;
 }

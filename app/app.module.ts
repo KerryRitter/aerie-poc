@@ -1,7 +1,18 @@
 import { Module } from './aerie/core/decorators/module.decorator';
 import { CatsModule } from './modules/cats/cats.module';
+import { Router } from './aerie/core/router';
+import { LoggingMiddleware } from './modules/cats/middleware/logging.middleware';
+import { AuthGuard } from './modules/cats/guards/auth.guard';
+import { LoggingInterceptor } from './modules/cats/interceptors/logging.interceptor';
 
 @Module({
   imports: [CatsModule],
 })
-export class AppModule {}
+export class AppModule {
+  constructor(router: Router) {
+    // Add global middleware, guards, and interceptors
+    router.useGlobalMiddleware(new LoggingMiddleware());
+    router.useGlobalGuards(new AuthGuard());
+    router.useGlobalInterceptors(new LoggingInterceptor());
+  }
+}

@@ -15,7 +15,7 @@ import { CatsList } from './views/cats-list';
 
 @Dependencies(CatsServerService)
 @ViewController('cats')
-@UseMiddleware(new LoggingMiddleware())
+@UseMiddleware(LoggingMiddleware)
 @UseGuards(AuthGuard)
 @UseInterceptors(LoggingInterceptor)
 export class CatsViewController {

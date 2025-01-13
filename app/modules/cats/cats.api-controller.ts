@@ -24,7 +24,7 @@ import { LoggingInterceptor } from './interceptors/logging.interceptor';
 
 @Dependencies(CatsServerService)
 @ApiController('cats')
-@UseMiddleware(new LoggingMiddleware())
+@UseMiddleware(LoggingMiddleware)
 @UseGuards(AuthGuard)
 @UseInterceptors(LoggingInterceptor)
 export class CatsApiController {

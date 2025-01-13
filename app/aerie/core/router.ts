@@ -86,6 +86,9 @@ export class Router {
   private viewHandlers: Map<string, ViewHandler> = new Map();
   private viewRegistry: ViewRegistry = {};
   private readonly container: Container;
+  private globalMiddleware: Middleware[] = [];
+  private globalGuards: Guard[] = [];
+  private globalInterceptors: Interceptor[] = [];
 
   private constructor(private readonly config: AerieConfig) {
     this.container = Container.getInstance();
@@ -274,7 +277,7 @@ export class Router {
       ? Reflect.getMetadata(GUARDS_METADATA, target, methodName) || []
       : [];
 
-    return [...classGuards, ...methodGuards];
+    return [...this.globalGuards, ...classGuards, ...methodGuards];
   }
 
   private getMiddleware(target: any, methodName?: string): Middleware[] {
@@ -284,7 +287,7 @@ export class Router {
       ? Reflect.getMetadata(MIDDLEWARE_METADATA, target, methodName) || []
       : [];
 
-    return [...classMiddleware, ...methodMiddleware];
+    return [...this.globalMiddleware, ...classMiddleware, ...methodMiddleware];
   }
 
   private executeMiddleware(
@@ -324,7 +327,11 @@ export class Router {
       ? Reflect.getMetadata(INTERCEPTORS_METADATA, target, methodName) || []
       : [];
 
-    return [...classInterceptors, ...methodInterceptors];
+    return [
+      ...this.globalInterceptors,
+      ...classInterceptors,
+      ...methodInterceptors,
+    ];
   }
 
   registerController(controllerClass: Type) {
@@ -528,5 +535,17 @@ export class Router {
       },
       Component: CatchAllRoute,
     };
+  }
+
+  useGlobalMiddleware(...middleware: Middleware[]) {
+    this.globalMiddleware.push(...middleware);
+  }
+
+  useGlobalGuards(...guards: Guard[]) {
+    this.globalGuards.push(...guards);
+  }
+
+  useGlobalInterceptors(...interceptors: Interceptor[]) {
+    this.globalInterceptors.push(...interceptors);
   }
 }

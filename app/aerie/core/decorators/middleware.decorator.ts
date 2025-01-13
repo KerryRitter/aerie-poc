@@ -1,24 +1,31 @@
-import { Middleware } from '../types';
+import { Middleware, Type, MiddlewareFunction } from '../types';
 import { MIDDLEWARE_METADATA } from '../reflect';
 
-export function UseMiddleware(...middleware: Middleware[]) {
-  return function (target: any, propertyKey?: string) {
-    const existingMiddleware: Middleware[] =
-      Reflect.getMetadata(MIDDLEWARE_METADATA, target.constructor) || [];
+type MiddlewareClass = Type<{ use: MiddlewareFunction }>;
+
+export function UseMiddleware(
+  ...middleware: (MiddlewareClass | { use: MiddlewareFunction })[]
+) {
+  return function (target: any, propertyKey?: string | symbol) {
+    const existingMiddleware =
+      Reflect.getMetadata(MIDDLEWARE_METADATA, target) || [];
+    const middlewareInstances = middleware.map((m) =>
+      typeof m === 'function' ? new m() : m
+    );
 
     if (propertyKey) {
       // Method decorator
       Reflect.defineMetadata(
         MIDDLEWARE_METADATA,
-        [...existingMiddleware, ...middleware],
-        target.constructor,
+        [...existingMiddleware, ...middlewareInstances],
+        target,
         propertyKey
       );
     } else {
       // Class decorator
       Reflect.defineMetadata(
         MIDDLEWARE_METADATA,
-        [...existingMiddleware, ...middleware],
+        [...existingMiddleware, ...middlewareInstances],
         target
       );
     }

@@ -1,4 +1,5 @@
-import type { Type } from '../types';
+import { Type } from '../types';
+import { Router } from '../router';
 import { getControllerMetadata } from './http.decorator';
 
 export const MODULE_METADATA_KEY = Symbol('MODULE');
@@ -8,7 +9,6 @@ export type ModuleOptions = {
   imports?: Type[];
   controllers?: Type[];
   providers?: Type[];
-  // exports?: Type[];
 };
 
 export type ModuleMetadata = {
@@ -16,13 +16,10 @@ export type ModuleMetadata = {
   apiControllers: Type[];
   viewControllers: Type[];
   providers?: Type[];
-  // exports?: Type[];
 };
 
 export function Module(options: ModuleOptions) {
-  return function <T extends { new (...args: any[]): any }>(target: T) {
-    console.log('Applying Module decorator to:', target.name);
-
+  return function (target: Type) {
     // Split controllers into api and view controllers
     const apiControllers: Type[] = [];
     const viewControllers: Type[] = [];
@@ -60,16 +57,19 @@ export function Module(options: ModuleOptions) {
       viewControllers,
     };
 
-    console.log('Setting module metadata:', {
-      module: target.name,
-      apiControllers: apiControllers.map((c) => c.name),
-      viewControllers: viewControllers.map((c) => c.name),
-      providers: options.providers?.map((p) => p.name),
-      imports: options.imports?.map((m) => m.name),
-    });
-
     Reflect.defineMetadata(MODULE_METADATA_KEY, metadata, target);
-    return target;
+
+    return class extends target {
+      constructor(router?: Router) {
+        super();
+
+        if (options.controllers) {
+          options.controllers.forEach((controller) => {
+            router?.registerController(controller);
+          });
+        }
+      }
+    };
   };
 }
 
