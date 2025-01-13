@@ -9,13 +9,24 @@ const pendingRoutes = new WeakMap<
   Map<string | symbol, RouteMetadata>
 >();
 
-export const ApiRoute = {
-  Get: (path: string = '') => createRouteDecorator('GET', path),
-  Post: (path: string = '') => createRouteDecorator('POST', path),
-  Put: (path: string = '') => createRouteDecorator('PUT', path),
-  Patch: (path: string = '') => createRouteDecorator('PATCH', path),
-  Delete: (path: string = '') => createRouteDecorator('DELETE', path),
-};
+export function Controller(prefix: string = '') {
+  const apiPrefix = `/api/${prefix}`.replace(/\/+/g, '/').replace(/\/$/, '');
+  return createControllerDecorator(apiPrefix, 'api');
+}
+
+export function ViewController(prefix: string = '') {
+  return createControllerDecorator(prefix, 'view');
+}
+
+export const Get = (path: string = '') => createRouteDecorator('GET', path);
+export const Post = (path: string = '') => createRouteDecorator('POST', path);
+export const Put = (path: string = '') => createRouteDecorator('PUT', path);
+export const Delete = (path: string = '') =>
+  createRouteDecorator('DELETE', path);
+export const Patch = (path: string = '') => createRouteDecorator('PATCH', path);
+export const Options = (path: string = '') =>
+  createRouteDecorator('OPTIONS', path);
+export const Head = (path: string = '') => createRouteDecorator('HEAD', path);
 
 export const Action = {
   default: (path: string = '', component?: ReactElement) =>
@@ -32,15 +43,6 @@ export const Action = {
 
 export const Loader = (path: string = '', component?: ReactElement) =>
   createRouteDecorator('GET', path, component);
-
-export function ApiController(prefix: string = '') {
-  const apiPrefix = `/api/${prefix}`.replace(/\/+/g, '/').replace(/\/$/, '');
-  return createControllerDecorator(apiPrefix, 'api');
-}
-
-export function ViewController(prefix: string = '') {
-  return createControllerDecorator(prefix, 'view');
-}
 
 function createControllerDecorator(prefix: string, type: ControllerType) {
   return function <T extends Type>(target: T) {

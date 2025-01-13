@@ -1,6 +1,9 @@
 import {
-  ApiController,
-  ApiRoute,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
 } from '../../aerie/core/decorators/http.decorator';
 import {
   Body,
@@ -23,14 +26,14 @@ import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decora
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 
 @Dependencies(CatsService)
-@ApiController('cats')
+@Controller('cats')
 @UseMiddleware(LoggingMiddleware)
 @UseGuards(AuthGuard)
 @UseInterceptors(LoggingInterceptor)
-export class CatsApiController {
+export class CatsController {
   constructor(private readonly catsService: CatsService) {}
 
-  @ApiRoute.Get()
+  @Get()
   @HttpCode(200)
   @Header('Cache-Control', 'max-age=60')
   async findAll(@Query('limit') limit?: string) {
@@ -42,18 +45,18 @@ export class CatsApiController {
     return cats;
   }
 
-  @ApiRoute.Get(':id')
+  @Get(':id')
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.catsService.findOne(id);
   }
 
-  @ApiRoute.Post()
+  @Post()
   @HttpCode(201)
   async create(@Body() createCat: Omit<Cat, 'id' | 'createdAt'>) {
     return this.catsService.create(createCat);
   }
 
-  @ApiRoute.Put(':id')
+  @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCat: Partial<Omit<Cat, 'id' | 'createdAt'>>
@@ -61,7 +64,7 @@ export class CatsApiController {
     return this.catsService.update(id, updateCat);
   }
 
-  @ApiRoute.Delete(':id')
+  @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.catsService.delete(id);
