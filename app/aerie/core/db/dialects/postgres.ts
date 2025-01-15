@@ -12,15 +12,8 @@ export class PostgresDbDialect<TSchema extends Record<string, unknown>>
   implements DbDialect<TSchema>
 {
   async initialize(config: AerieConfig['database']) {
-    if (
-      !config.url &&
-      (!config.host ||
-        !config.port ||
-        !config.user ||
-        !config.password ||
-        !config.database)
-    ) {
-      throw new Error('Missing required PostgreSQL configuration');
+    if (config.dialect !== 'postgres') {
+      throw new Error('Invalid dialect type for PostgreSQL');
     }
 
     try {
@@ -30,12 +23,7 @@ export class PostgresDbDialect<TSchema extends Record<string, unknown>>
       ]);
 
       const pool = new Pool({
-        connectionString: config.url,
-        host: config.host,
-        port: config.port,
-        user: config.user,
-        password: config.password,
-        database: config.database,
+        connectionString: config.connectionString,
       });
 
       const orm = drizzle(pool, { schema: config.schema });
@@ -49,5 +37,32 @@ export class PostgresDbDialect<TSchema extends Record<string, unknown>>
         'Failed to load PostgreSQL dependencies. Make sure they are installed: npm install pg'
       );
     }
+  }
+
+  static fromDrizzleConfig(
+    drizzleConfig: {
+      driver: string;
+      dbCredentials: {
+        connectionString?: string;
+        host?: string;
+        port?: number;
+        user?: string;
+        password?: string;
+        database?: string;
+      };
+    },
+    schema: any
+  ): AerieConfig['database'] {
+    if (drizzleConfig.driver !== 'pg') {
+      throw new Error('Invalid driver type for PostgreSQL');
+    }
+
+    return {
+      dialect: 'postgres',
+      connectionString:
+        drizzleConfig.dbCredentials.connectionString ||
+        `postgresql://${drizzleConfig.dbCredentials.user}:${drizzleConfig.dbCredentials.password}@${drizzleConfig.dbCredentials.host}:${drizzleConfig.dbCredentials.port}/${drizzleConfig.dbCredentials.database}`,
+      schema,
+    };
   }
 }

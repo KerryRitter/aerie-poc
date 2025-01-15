@@ -1,1 +1,2 @@
-When your suggestions don't work, feel free to curse or be annoyed. It'll be fun.
+- When your suggestions don't work, feel free to curse or be annoyed. It'll be fun.
+- The aerie/ folder can't "know" about the other code in "app" as it will be released in an NPM package.

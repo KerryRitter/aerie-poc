@@ -18,6 +18,8 @@ export class DbService<TSchema extends Record<string, unknown>> {
   private _orm?: DbType<TSchema>[keyof DbType<TSchema>];
   private _qb?: Kysely<TSchema>;
   private readonly isEnabled: boolean;
+  private initializationPromise?: Promise<void>;
+  private initializationError?: Error;
 
   constructor(
     private readonly config: AerieConfig,
@@ -27,24 +29,43 @@ export class DbService<TSchema extends Record<string, unknown>> {
     console.log('DbService constructor - database config:', config.database);
     this.isEnabled = config.database.dialect !== 'none';
     console.log('DbService constructor - isEnabled:', this.isEnabled);
+
+    // Start initialization if database is enabled
+    if (this.isEnabled) {
+      this.initializationPromise = this.initializeConnection().catch((err) => {
+        this.initializationError = err;
+        throw err;
+      });
+    }
   }
 
   async initializeConnection() {
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
     console.log('DbService initializeConnection - config:', this.config);
     console.log(
       'DbService initializeConnection - database config:',
       this.config.database
     );
+
+    if (!this.isEnabled) {
+      throw new Error(
+        'Database is not enabled. Make sure drizzle.config.ts exists and is properly configured.'
+      );
+    }
+
     const dbConfig = this.config.database;
     if (!dbConfig?.schema) {
-      console.log('No schema provided, skipping initialization');
-      return;
+      throw new Error('No schema provided for database initialization');
     }
 
     const dialect = this.dialectFactory.get<TSchema>(dbConfig.dialect);
     if (!dialect) {
-      console.log('No dialect found for', dbConfig.dialect);
-      return;
+      throw new Error(
+        `No dialect implementation found for ${dbConfig.dialect}`
+      );
     }
 
     try {
@@ -53,19 +74,24 @@ export class DbService<TSchema extends Record<string, unknown>> {
       this._qb = connection.qb;
       console.log('DbService initializeConnection - connection initialized');
     } catch (err) {
-      console.error('Failed to initialize connection:', err);
-      throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to initialize database connection: ${message}`);
     }
   }
 
   get orm() {
     if (!this.isEnabled) {
       throw new Error(
-        'Database is not enabled. Set dialect to postgres, mysql, or sqlite to enable.'
+        'Database is not enabled. Make sure drizzle.config.ts exists and is properly configured.'
       );
     }
+    if (this.initializationError) {
+      throw this.initializationError;
+    }
     if (!this._orm) {
-      throw new Error('Database not initialized - did you provide a schema?');
+      throw new Error(
+        'Database connection not initialized. Make sure you have imported DbModule and waited for initialization to complete.'
+      );
     }
     return this._orm;
   }
@@ -73,11 +99,16 @@ export class DbService<TSchema extends Record<string, unknown>> {
   get qb() {
     if (!this.isEnabled) {
       throw new Error(
-        'Database is not enabled. Set dialect to postgres, mysql, or sqlite to enable.'
+        'Database is not enabled. Make sure drizzle.config.ts exists and is properly configured.'
       );
     }
+    if (this.initializationError) {
+      throw this.initializationError;
+    }
     if (!this._qb) {
-      throw new Error('Database not initialized - did you provide a schema?');
+      throw new Error(
+        'Database connection not initialized. Make sure you have imported DbModule and waited for initialization to complete.'
+      );
     }
     return this._qb;
   }

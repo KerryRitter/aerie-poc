@@ -12,8 +12,8 @@ export class SqliteDbDialect<TSchema extends Record<string, unknown>>
   implements DbDialect<TSchema>
 {
   async initialize(config: AerieConfig['database']) {
-    if (!config.file) {
-      throw new Error('SQLite file path is required');
+    if (config.dialect !== 'sqlite') {
+      throw new Error('Invalid dialect type for SQLite');
     }
 
     try {
@@ -36,5 +36,29 @@ export class SqliteDbDialect<TSchema extends Record<string, unknown>>
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Failed to initialize SQLite: ${message}`);
     }
+  }
+
+  static fromDrizzleConfig(
+    drizzleConfig: {
+      driver: string;
+      dbCredentials: {
+        url?: string;
+      };
+    },
+    schema: any
+  ): AerieConfig['database'] {
+    if (drizzleConfig.driver !== 'better-sqlite') {
+      throw new Error('Invalid driver type for SQLite');
+    }
+
+    if (!drizzleConfig.dbCredentials.url) {
+      throw new Error('Missing required SQLite file path');
+    }
+
+    return {
+      dialect: 'sqlite',
+      file: drizzleConfig.dbCredentials.url,
+      schema,
+    };
   }
 }

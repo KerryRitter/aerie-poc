@@ -12,15 +12,8 @@ export class MySqlDbDialect<TSchema extends Record<string, unknown>>
   implements DbDialect<TSchema>
 {
   async initialize(config: AerieConfig['database']) {
-    if (
-      !config.url &&
-      (!config.host ||
-        !config.port ||
-        !config.user ||
-        !config.password ||
-        !config.database)
-    ) {
-      throw new Error('Missing required MySQL configuration');
+    if (config.dialect !== 'mysql') {
+      throw new Error('Invalid dialect type for MySQL');
     }
 
     try {
@@ -34,7 +27,6 @@ export class MySqlDbDialect<TSchema extends Record<string, unknown>>
       ]);
 
       const pool = mysql.createPool({
-        uri: config.url,
         host: config.host,
         port: config.port,
         user: config.user,
@@ -58,5 +50,42 @@ export class MySqlDbDialect<TSchema extends Record<string, unknown>>
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Failed to initialize MySQL: ${message}`);
     }
+  }
+
+  static fromDrizzleConfig(
+    drizzleConfig: {
+      driver: string;
+      dbCredentials: {
+        host?: string;
+        port?: number;
+        user?: string;
+        password?: string;
+        database?: string;
+      };
+    },
+    schema: any
+  ): AerieConfig['database'] {
+    if (drizzleConfig.driver !== 'mysql2') {
+      throw new Error('Invalid driver type for MySQL');
+    }
+
+    if (
+      !drizzleConfig.dbCredentials.host ||
+      !drizzleConfig.dbCredentials.user ||
+      !drizzleConfig.dbCredentials.password ||
+      !drizzleConfig.dbCredentials.database
+    ) {
+      throw new Error('Missing required MySQL credentials');
+    }
+
+    return {
+      dialect: 'mysql',
+      host: drizzleConfig.dbCredentials.host,
+      port: drizzleConfig.dbCredentials.port || 3306,
+      user: drizzleConfig.dbCredentials.user,
+      password: drizzleConfig.dbCredentials.password,
+      database: drizzleConfig.dbCredentials.database,
+      schema,
+    };
   }
 }

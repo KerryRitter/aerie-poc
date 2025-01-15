@@ -1,6 +1,7 @@
 import { AppBootstrap } from './aerie/core/bootstrap';
 import { AppModule } from './app.module';
 import { users, cats } from './schema';
+import drizzleConfig from '../drizzle.config';
 
 let app: AppBootstrap;
 
@@ -9,9 +10,8 @@ export async function createApp() {
     app = await AppBootstrap.initializeRoot(AppModule, {
       viewGuardRedirect: 'auth/login',
       database: {
-        dialect: 'sqlite',
-        file: process.cwd() + '/db.sqlite',
         schema: { users, cats },
+        drizzleConfig,
       },
     });
   }

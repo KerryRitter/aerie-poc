@@ -5,8 +5,51 @@ import {
 import { ServerOnly } from '../../environment/decorators';
 import type { DbDialect } from './dialect.interface';
 import { PostgresDbDialect, MySqlDbDialect, SqliteDbDialect } from '.';
+import type { AerieConfig } from '../../aerie-config';
 
 type Dialect = 'none' | 'postgres' | 'mysql' | 'sqlite';
+type DrizzleConfig = {
+  driver: 'pg' | 'mysql2' | 'better-sqlite';
+  dbCredentials: {
+    url?: string;
+    connectionString?: string;
+    host?: string;
+    port?: number;
+    user?: string;
+    password?: string;
+    database?: string;
+  };
+};
+
+// Separate utility class for config building
+export class DbConfigBuilder {
+  static buildConfig(
+    drizzleConfig: DrizzleConfig | undefined,
+    schema: any
+  ): AerieConfig['database'] {
+    if (!drizzleConfig) {
+      return { dialect: 'none', schema };
+    }
+
+    try {
+      switch (drizzleConfig.driver) {
+        case 'better-sqlite':
+          return SqliteDbDialect.fromDrizzleConfig(drizzleConfig, schema);
+        case 'pg':
+          return PostgresDbDialect.fromDrizzleConfig(drizzleConfig, schema);
+        case 'mysql2':
+          return MySqlDbDialect.fromDrizzleConfig(drizzleConfig, schema);
+        default:
+          throw new Error(
+            `Unsupported database driver: ${drizzleConfig.driver}`
+          );
+      }
+    } catch (err) {
+      console.warn('Failed to configure database:', err);
+      return { dialect: 'none', schema };
+    }
+  }
+}
 
 @Injectable()
 @Dependencies(PostgresDbDialect, MySqlDbDialect, SqliteDbDialect)

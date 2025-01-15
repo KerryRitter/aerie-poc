@@ -1,10 +1,20 @@
 import type { Type } from './types';
-import { AerieConfig } from './aerie-config';
+import { AerieConfig, type DrizzleConfig } from './aerie-config';
 import { Router } from './router';
 import { getModuleMetadata, Module } from './decorators/module.decorator';
 import { AerieCommonModule } from './common/common.module';
 import { DbService } from './db';
 import { Container } from './container';
+
+type AppConfig = {
+  viewGuardRedirect?: string;
+  database?: {
+    schema: any;
+    drizzleConfig?: DrizzleConfig;
+  };
+};
+
+type InitConfig = Omit<Partial<AerieConfig>, 'database'> & AppConfig;
 
 export class AppBootstrap {
   private static instance: AppBootstrap;
@@ -15,9 +25,9 @@ export class AppBootstrap {
 
   static async initializeRoot<TModule extends Type>(
     rootModule: TModule,
-    config: Omit<Partial<AerieConfig>, 'rootModule'> = {}
+    config: AppConfig = {}
   ) {
-    const app = this.getInstance({
+    const app = await this.getInstance({
       rootModule,
       ...config,
     });
@@ -25,24 +35,28 @@ export class AppBootstrap {
     return app;
   }
 
-  static getInstance(config: Partial<AerieConfig>) {
+  static async getInstance(config: InitConfig) {
     if (!this.instance) {
-      this.instance = new AppBootstrap(config);
+      this.instance = await AppBootstrap.create(config);
     }
     return this.instance;
   }
 
-  private constructor(config: Partial<AerieConfig>) {
-    // Create and store the config instance first
-    const configInstance = AerieConfig.initialize(config);
+  private static async create(config: InitConfig): Promise<AppBootstrap> {
+    return new AppBootstrap(
+      await AerieConfig.initialize(config, config.database)
+    );
+  }
+
+  private constructor(config: AerieConfig) {
+    this.config = config;
 
     // Register the actual instance in the container before anything else
     const container = Container.getInstance();
     container.register(AerieConfig);
-    container.setInstance(AerieConfig, configInstance);
+    container.setInstance(AerieConfig, config);
 
     // Now initialize router with our config
-    this.config = configInstance;
     this.router = Router.getInstance(this.config);
   }
 
