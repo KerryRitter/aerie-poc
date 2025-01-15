@@ -184,7 +184,7 @@ export class Router {
     );
     console.log('Controller result:', result);
 
-    // For view controllers, return the result with the viewId and component
+    // For view controllers, return the result with the viewId
     const viewId = `${route.path}/${route.methodName}`
       .replace(/\/+/g, '/')
       .replace(/^\/+|\/+$/g, '');
@@ -193,7 +193,6 @@ export class Router {
     const finalResult = {
       ...result,
       __viewId: viewId,
-      __component: route.component,
     };
     console.log('Final result:', finalResult);
     return finalResult;
@@ -349,18 +348,18 @@ export class Router {
           this.addViewRoute(
             metadata.path,
             controllerClass,
-            routeMetadata.component || null,
+            metadata.component || null,
             methodName
           );
 
           // Add to viewRegistry for component lookup
-          if (routeMetadata.component) {
+          if (metadata.component) {
             // Use the same format as handleViewRoute: path/methodName
             const viewId = `${metadata.path}/${methodName}`
               .replace(/\/+/g, '/')
               .replace(/^\/+|\/+$/g, '');
             console.log('Registering component with viewId:', viewId);
-            this.viewRegistry[viewId] = () => routeMetadata.component!;
+            this.viewRegistry[viewId] = () => metadata.component!;
           }
         }
       }
@@ -456,22 +455,28 @@ export class Router {
     const CatchAllRoute: React.FC = () => {
       const data = useLoaderData<{
         __viewId?: string;
-        __component?: ReactElement;
       }>();
       console.log('Loader data:', data);
 
-      if (!data) {
-        console.log('No loader data');
+      if (!data || !data.__viewId) {
+        console.log('No loader data or viewId');
         return null;
       }
 
-      const Component = data.__component || null;
-      console.log('Found component:', { viewId: data.__viewId, Component });
+      const ComponentType = this.viewRegistry[data.__viewId];
+      console.log('Found component type:', {
+        viewId: data.__viewId,
+        ComponentType,
+      });
+
+      if (!ComponentType) {
+        return null;
+      }
 
       return React.createElement(
         ModuleLoaderProvider,
         { value: moduleLoader },
-        Component
+        React.createElement(ComponentType, data)
       );
     };
 

@@ -10,7 +10,7 @@ export async function createApp() {
       viewGuardRedirect: 'auth/login',
       database: {
         dialect: 'sqlite',
-        file: ':memory:', // Use in-memory SQLite for development
+        file: process.cwd() + '/db.sqlite',
         schema: { users, cats },
       },
     });

@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS cats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  age INTEGER NOT NULL,
+  breed TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+); 

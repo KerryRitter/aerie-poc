@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import React, { type ReactElement } from 'react';
 import { useProvider } from '../../../aerie/react/hooks';
 import type { Cat } from '../cats.types';
