@@ -31,7 +31,7 @@ export function Module(options: ModuleOptions) {
         const metadata = getControllerMetadata(controller);
         if (!metadata) {
           throw new Error(
-            `${controller.name} in ${target.name} must be decorated with @ApiController or @ViewController`
+            `${controller.name} in ${target.name} must be decorated with @Controller`
           );
         }
 
@@ -62,13 +62,23 @@ export function Module(options: ModuleOptions) {
     Reflect.defineMetadata(MODULE_METADATA_KEY, metadata, target);
 
     return class extends target {
-      constructor(router?: Router) {
+      constructor(...args: any[]) {
         super();
 
-        if (options.controllers) {
+        // Find the router instance in the constructor args
+        const router = args.find((arg): arg is Router => arg instanceof Router);
+
+        if (router && options.controllers) {
+          console.log('Registering controllers for module:', target.name);
           options.controllers.forEach((controller) => {
-            router?.registerController(controller);
+            console.log('Registering controller:', controller.name);
+            router.registerController(controller);
           });
+        } else if (options.controllers) {
+          console.warn(
+            'No router instance found when constructing module:',
+            target.name
+          );
         }
       }
     };

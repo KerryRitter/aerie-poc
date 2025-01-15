@@ -1,9 +1,4 @@
-import * as React from 'react';
 import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
-import {
-  ViewController,
-  Loader,
-} from '../../aerie/core/decorators/http.decorator';
 import { CatsService } from './cats.service';
 import { UseMiddleware } from '../../aerie/core/decorators/middleware.decorator';
 import { LoggingMiddleware } from './middleware/logging.middleware';
@@ -12,16 +7,17 @@ import { AuthGuard } from './guards/auth.guard';
 import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decorator';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { CatsList } from './views/cats-list';
+import { Controller, Get } from '../../aerie/core/decorators/http.decorator';
 
 @Dependencies(CatsService)
-@ViewController('cats')
+@Controller('cats', <CatsList />)
 @UseMiddleware(LoggingMiddleware)
 @UseGuards(AuthGuard)
 @UseInterceptors(LoggingInterceptor)
 export class CatsViewController {
   constructor(private readonly catsService: CatsService) {}
 
-  @Loader('', <CatsList />)
+  @Get()
   async index() {
     const cats = await this.catsService.findAll();
     return { cats };

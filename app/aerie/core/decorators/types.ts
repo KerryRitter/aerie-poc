@@ -14,5 +14,4 @@ export type ControllerType = 'api' | 'view';
 export type RouteMetadata = {
   path: string;
   method: HttpMethod;
-  component?: ReactElement;
 };

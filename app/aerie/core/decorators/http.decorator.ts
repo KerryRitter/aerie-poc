@@ -9,42 +9,141 @@ const pendingRoutes = new WeakMap<
   Map<string | symbol, RouteMetadata>
 >();
 
-export function Controller(prefix: string = '') {
-  const apiPrefix = `/api/${prefix}`.replace(/\/+/g, '/').replace(/\/$/, '');
-  return createControllerDecorator(apiPrefix, 'api');
+export function Controller(prefix: string = '', component?: ReactElement) {
+  const type = component ? 'view' : 'api';
+  const apiPrefix =
+    type === 'api'
+      ? `/api/${prefix}`.replace(/\/+/g, '/').replace(/\/$/, '')
+      : prefix;
+
+  return createControllerDecorator(apiPrefix, type, component);
 }
 
-export function ViewController(prefix: string = '') {
-  return createControllerDecorator(prefix, 'view');
-}
-
-export const Get = (path: string = '') => createRouteDecorator('GET', path);
-export const Post = (path: string = '') => createRouteDecorator('POST', path);
-export const Put = (path: string = '') => createRouteDecorator('PUT', path);
-export const Delete = (path: string = '') =>
-  createRouteDecorator('DELETE', path);
-export const Patch = (path: string = '') => createRouteDecorator('PATCH', path);
-export const Options = (path: string = '') =>
-  createRouteDecorator('OPTIONS', path);
-export const Head = (path: string = '') => createRouteDecorator('HEAD', path);
-
-export const Action = {
-  default: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('POST', path, component),
-  Post: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('POST', path, component),
-  Put: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('PUT', path, component),
-  Patch: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('PATCH', path, component),
-  Delete: (path: string = '', component?: ReactElement) =>
-    createRouteDecorator('DELETE', path, component),
+export const Get = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Get decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('GET', path)(target, propertyKey, descriptor);
+  };
 };
 
-export const Loader = (path: string = '', component?: ReactElement) =>
-  createRouteDecorator('GET', path, component);
+export const Post = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Post decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('POST', path)(target, propertyKey, descriptor);
+  };
+};
 
-function createControllerDecorator(prefix: string, type: ControllerType) {
+export const Put = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Put decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('PUT', path)(target, propertyKey, descriptor);
+  };
+};
+
+export const Delete = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Delete decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('DELETE', path)(
+      target,
+      propertyKey,
+      descriptor
+    );
+  };
+};
+
+export const Patch = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Patch decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('PATCH', path)(target, propertyKey, descriptor);
+  };
+};
+
+export const Options = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Options decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('OPTIONS', path)(
+      target,
+      propertyKey,
+      descriptor
+    );
+  };
+};
+
+export const Head = (path: string = '') => {
+  return function (
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: PropertyDescriptor
+  ) {
+    const metadata = getControllerMetadata(target.constructor as Type);
+    if (metadata?.type === 'view' && path) {
+      console.warn(
+        `Path parameter "${path}" in @Head decorator will be ignored for view controllers.`
+      );
+    }
+    return createRouteDecorator('HEAD', path)(target, propertyKey, descriptor);
+  };
+};
+
+function createControllerDecorator(
+  prefix: string,
+  type: ControllerType,
+  component?: ReactElement
+) {
   return function <T extends Type>(target: T) {
     console.log(`Applying ${type} controller decorator to:`, target.name);
 
@@ -55,12 +154,14 @@ function createControllerDecorator(prefix: string, type: ControllerType) {
       path: prefix,
       routes,
       type,
+      component,
     };
 
     console.log('Setting controller metadata:', {
       controller: target.name,
       path: prefix,
       type,
+      component: !!component,
       routes: Array.from(routes.entries()).map(([key, value]) => ({
         key: String(key),
         method: value.method,
@@ -73,11 +174,7 @@ function createControllerDecorator(prefix: string, type: ControllerType) {
   };
 }
 
-function createRouteDecorator(
-  method: HttpMethod,
-  path: string = '',
-  component?: ReactElement
-) {
+function createRouteDecorator(method: HttpMethod, path: string = '') {
   return function (
     target: object,
     propertyKey: string | symbol,
@@ -90,14 +187,13 @@ function createRouteDecorator(
       pendingRoutes.set(target, routes);
     }
 
-    routes.set(propertyKey, { method, path, component });
+    routes.set(propertyKey, { method, path });
 
     console.log('Added route:', {
       target: target.constructor.name,
       propertyKey: String(propertyKey),
       method,
       path,
-      component: !!component,
     });
 
     return descriptor;
@@ -108,6 +204,7 @@ export type ControllerMetadata = {
   path: string;
   routes: Map<string | symbol, RouteMetadata>;
   type: ControllerType;
+  component?: ReactElement;
 };
 
 export function getControllerMetadata(

@@ -34,15 +34,9 @@ type RouteParam = {
 type ViewRoute = {
   type: 'view';
   path: string;
-  layout: string;
-  controller?: Type;
+  controller: Type;
+  component: ReactElement | null;
   methodName?: string;
-  children: Array<{
-    path: string;
-    component: ReactElement | string | null;
-    options?: { index?: boolean };
-    routeFile?: string;
-  }>;
 };
 
 type ApiRoute = {
@@ -63,21 +57,7 @@ type ViewRegistry = {
   [key: string]: React.ComponentType<any>;
 };
 
-type Route = {
-  type: 'api' | 'view';
-  path: string;
-  method?: string;
-  controller: Type;
-  methodName: string;
-  params?: RouteParam[];
-  layout?: string;
-  children?: Array<{
-    path: string;
-    component: ReactElement | string | null;
-    options?: { index?: boolean };
-    routeFile?: string;
-  }>;
-};
+type Route = ApiRoute | ViewRoute;
 
 export class Router {
   private static instance: Router;
@@ -141,7 +121,7 @@ export class Router {
       view: this.viewRoutes,
     });
 
-    // Try to find matching API route
+    // Try to find matching API route first
     const apiRoute = this.apiRoutes.find((r) => {
       const match = matchPath({ path: r.path, end: true }, path);
       return match && r.method === method;
@@ -152,7 +132,7 @@ export class Router {
       return apiRoute;
     }
 
-    // Try to find matching view route
+    // Then try to find matching view route
     const viewRoute = this.viewRoutes.find((r) => {
       const match = matchPath({ path: r.path, end: true }, path);
       return match;
@@ -187,8 +167,8 @@ export class Router {
   ) {
     console.log('handleViewRoute:', { route });
 
-    if (!route.controller || !route.methodName) {
-      console.log('No controller or methodName');
+    if (!route.methodName) {
+      console.log('No methodName');
       return null;
     }
 
@@ -204,7 +184,7 @@ export class Router {
     );
     console.log('Controller result:', result);
 
-    // For view controllers, return the result with the viewId
+    // For view controllers, return the result with the viewId and component
     const viewId = `${route.path}/${route.methodName}`
       .replace(/\/+/g, '/')
       .replace(/^\/+|\/+$/g, '');
@@ -213,6 +193,7 @@ export class Router {
     const finalResult = {
       ...result,
       __viewId: viewId,
+      __component: route.component,
     };
     console.log('Final result:', finalResult);
     return finalResult;
@@ -367,16 +348,9 @@ export class Router {
           // Add to viewRoutes for routing
           this.addViewRoute(
             metadata.path,
-            `${metadata.path}/layout.tsx`,
             controllerClass,
-            methodName,
-            [
-              {
-                path: routeMetadata.path || '',
-                component: routeMetadata.component || null,
-                options: { index: routeMetadata.path === '/' },
-              },
-            ]
+            routeMetadata.component || null,
+            methodName
           );
 
           // Add to viewRegistry for component lookup
@@ -412,23 +386,16 @@ export class Router {
 
   private addViewRoute(
     path: string,
-    layout: string,
-    controller: Type | undefined,
-    methodName: string | undefined,
-    children: Array<{
-      path: string;
-      component: ReactElement | string | null;
-      options?: { index?: boolean };
-      routeFile?: string;
-    }>
+    controller: Type,
+    component: ReactElement | null,
+    methodName: string | undefined
   ) {
     this.viewRoutes.push({
       type: 'view',
       path,
-      layout,
       controller,
+      component,
       methodName,
-      children,
     });
   }
 
@@ -436,7 +403,7 @@ export class Router {
     const routes: Route[] = Reflect.getMetadata(ROUTES_METADATA, module) || [];
 
     for (const route of routes) {
-      if (route.type === 'api' && route.method) {
+      if (route.type === 'api') {
         this.addApiRoute(
           route.path,
           route.method,
@@ -444,13 +411,12 @@ export class Router {
           route.methodName,
           route.params || []
         );
-      } else if (route.type === 'view' && route.layout && route.children) {
+      } else if (route.type === 'view') {
         this.addViewRoute(
           route.path,
-          route.layout,
           route.controller,
-          route.methodName,
-          route.children
+          route.component,
+          route.methodName
         );
       }
     }
@@ -488,7 +454,10 @@ export class Router {
     console.log('View Registry:', this.viewRegistry);
 
     const CatchAllRoute: React.FC = () => {
-      const data = useLoaderData<{ __viewId?: string }>();
+      const data = useLoaderData<{
+        __viewId?: string;
+        __component?: ReactElement;
+      }>();
       console.log('Loader data:', data);
 
       if (!data) {
@@ -496,13 +465,13 @@ export class Router {
         return null;
       }
 
-      const Component = data.__viewId ? this.viewRegistry[data.__viewId] : null;
+      const Component = data.__component || null;
       console.log('Found component:', { viewId: data.__viewId, Component });
 
       return React.createElement(
         ModuleLoaderProvider,
         { value: moduleLoader },
-        Component ? React.createElement(Component) : null
+        Component
       );
     };
 
