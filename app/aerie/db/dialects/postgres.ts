@@ -1,8 +1,8 @@
-import { Injectable } from '../../decorators/injectable.decorator';
-import { ServerOnly } from '../../environment/decorators';
+import { Injectable } from '@aerie/core/decorators';
+import { ServerOnly } from '@aerie/core/environment/decorators';
 import { DbDialect } from './dialect.interface';
 import { Kysely, PostgresDialect } from 'kysely';
-import type { AerieConfig } from '../../aerie-config';
+import type { AerieConfig } from '@aerie/core/aerie-config';
 
 export type PostgresDb<TSchema extends Record<string, unknown>> = any;
 

@@ -1,29 +1,25 @@
 import {
+  Body,
   Controller,
+  Delete,
+  Dependencies,
   Get,
+  Header,
+  HttpCode,
+  Param,
   Post,
   Put,
-  Delete,
-} from '../../aerie/core/decorators/http.decorator';
-import {
-  Body,
-  Param,
   Query,
-} from '../../aerie/core/decorators/http-params.decorator';
-import {
-  HttpCode,
-  Header,
-} from '../../aerie/core/decorators/http-response.decorator';
-import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
+  UseGuards,
+  UseInterceptors,
+  UseMiddleware,
+} from '@aerie/core/decorators';
+import { ParseIntPipe } from '@aerie/common/pipes';
 import { CatsService } from './cats.service';
 import type { Cat } from './cats.types';
-import { ParseIntPipe } from '../../aerie/core/pipes';
-import { UseMiddleware } from '../../aerie/core/decorators/middleware.decorator';
-import { LoggingMiddleware } from './middleware/logging.middleware';
-import { UseGuards } from '../../aerie/core/decorators/guards.decorator';
 import { AuthGuard } from './guards/auth.guard';
-import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decorator';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 
 @Dependencies(CatsService)
 @Controller('cats')

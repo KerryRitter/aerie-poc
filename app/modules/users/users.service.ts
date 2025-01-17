@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  Dependencies,
-} from '../../aerie/core/decorators/injectable.decorator';
-import { DbService } from '../../aerie/core/db';
-import type { MyDbService } from '../../schema';
+import { Dependencies, Injectable } from '@aerie/core/decorators';
+import { DbService } from '@aerie/db';
+import type { MyDbService } from '~/schema';
 
 @Injectable()
 @Dependencies(DbService)

@@ -1,5 +1,5 @@
-import { Injectable } from '~/aerie/core/decorators/injectable.decorator';
-import { ClientOnly } from '~/aerie/core/environment/decorators';
+import { Injectable } from '@aerie/core/decorators/injectable.decorator';
+import { ClientOnly } from '@aerie/core/environment/decorators';
 import type { Cat } from './cats.types';
 
 @Injectable()

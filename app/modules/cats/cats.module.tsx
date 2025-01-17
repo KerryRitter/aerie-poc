@@ -1,4 +1,4 @@
-import { Module } from '../../aerie/core/decorators/module.decorator';
+import { Module } from '@aerie/core/decorators';
 import { CatsService } from './cats.service';
 import { CatsClientService } from './cats.client-service';
 import { CatsController } from './cats.controller';

@@ -1,7 +1,7 @@
+import type { AerieConfig } from '@aerie/core/aerie-config';
+import { Injectable } from '@aerie/core/decorators';
+import { ServerOnly } from '@aerie/core/environment/decorators';
 import { Kysely, SqliteDialect } from 'kysely';
-import type { AerieConfig } from '../../aerie-config';
-import { Injectable } from '../../decorators/injectable.decorator';
-import { ServerOnly } from '../../environment/decorators';
 import type { DbDialect } from './dialect.interface';
 
 export type SqliteDb<TSchema extends Record<string, unknown>> = any;

@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  Dependencies,
-} from '../../decorators/injectable.decorator';
-import { ServerOnly } from '../../environment/decorators';
+import type { AerieConfig } from '@aerie/core/aerie-config';
+import { Dependencies, Injectable } from '@aerie/core/decorators';
+import { ServerOnly } from '@aerie/core/environment/decorators';
+import { MySqlDbDialect, PostgresDbDialect, SqliteDbDialect } from '.';
 import type { DbDialect } from './dialect.interface';
-import { PostgresDbDialect, MySqlDbDialect, SqliteDbDialect } from '.';
-import type { AerieConfig } from '../../aerie-config';
 
 type Dialect = 'none' | 'postgres' | 'mysql' | 'sqlite';
 type DrizzleConfig = {

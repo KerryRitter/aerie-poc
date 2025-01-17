@@ -1,5 +1,5 @@
-import { Injectable } from '~/aerie/core/decorators/injectable.decorator';
-import { Middleware, NextFunction } from '~/aerie/core/types';
+import { Injectable } from '@aerie/core/decorators/injectable.decorator';
+import { Middleware, NextFunction } from '@aerie/core/types';
 
 @Injectable()
 export class LoggingMiddleware {

@@ -1,13 +1,16 @@
-import { Dependencies } from '../../aerie/core/decorators/injectable.decorator';
+import {
+  Controller,
+  Dependencies,
+  Get,
+  UseGuards,
+  UseInterceptors,
+  UseMiddleware,
+} from '@aerie/core/decorators';
 import { CatsService } from './cats.service';
-import { UseMiddleware } from '../../aerie/core/decorators/middleware.decorator';
-import { LoggingMiddleware } from './middleware/logging.middleware';
-import { UseGuards } from '../../aerie/core/decorators/guards.decorator';
 import { AuthGuard } from './guards/auth.guard';
-import { UseInterceptors } from '../../aerie/core/decorators/interceptors.decorator';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 import { CatsList } from './views/cats-list';
-import { Controller, Get } from '../../aerie/core/decorators/http.decorator';
 
 @Dependencies(CatsService)
 @Controller('cats', <CatsList />)

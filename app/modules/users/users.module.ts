@@ -1,4 +1,4 @@
-import { Module } from '../../aerie/core/decorators/module.decorator';
+import { Module } from '@aerie/core/decorators';
 import { UsersService } from './users.service';
 
 @Module({

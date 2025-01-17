@@ -1,8 +1,4 @@
-import {
-  Interceptor,
-  ExecutionContext,
-  CallHandler,
-} from '../../../aerie/core/types';
+import { Interceptor, ExecutionContext, CallHandler } from '@aerie/core/types';
 
 export class LoggingInterceptor implements Interceptor {
   async intercept(context: ExecutionContext, next: CallHandler): Promise<any> {

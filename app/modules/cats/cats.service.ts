@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  Dependencies,
-} from '../../aerie/core/decorators/injectable.decorator';
-import { ServerOnly } from '../../aerie/core/environment/decorators';
-import { DbService } from '../../aerie/core/db';
+import { Dependencies, Injectable } from '@aerie/core/decorators';
+import { ServerOnly } from '@aerie/core/environment/decorators';
+import { DbService } from '@aerie/db';
 import type { MyDbService } from '../../schema';
 import type { Cat } from './cats.types';
 

@@ -1,4 +1,4 @@
-import { Guard, ExecutionContext } from '../../../aerie/core/types';
+import { Guard, ExecutionContext } from '@aerie/core/types';
 
 export class AuthGuard implements Guard {
   async canActivate(context: ExecutionContext): Promise<boolean> {

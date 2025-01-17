@@ -1,4 +1,4 @@
-import { AppBootstrap } from './aerie/core/bootstrap';
+import { AppBootstrap } from '@aerie/core/bootstrap';
 import { AppModule } from './app.module';
 import { users, cats } from './schema';
 import drizzleConfig from '../drizzle.config';

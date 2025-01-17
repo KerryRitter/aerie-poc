@@ -1,7 +1,7 @@
 import React, { type ReactElement } from 'react';
 import { useLoaderData } from '@remix-run/react';
 import type { Cat } from '../cats.types';
-import { createClientComponent } from '~/aerie/react/create-client-component';
+import { createClientComponent } from '@aerie/react/create-client-component';
 
 function CatItemFallback({ cat }: { cat: Cat }): ReactElement {
   return (

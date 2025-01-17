@@ -23,12 +23,13 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"]
+      "~/*": ["./app/*"],
+      "@aerie/*": ["./app/aerie/*"]
     },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
 
     // Vite takes care of building everything, not tsc.
-    "noEmit": true
-  }
+    "noEmit": true,
+  },
 }

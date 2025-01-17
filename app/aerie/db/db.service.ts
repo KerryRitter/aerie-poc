@@ -1,8 +1,8 @@
-import { Dependencies, Injectable } from '../decorators/injectable.decorator';
-import { ServerOnly } from '../environment/decorators';
+import { AerieConfig } from '@aerie/core/aerie-config';
+import { Dependencies, Injectable } from '@aerie/core/decorators';
+import { ServerOnly } from '@aerie/core/environment/decorators';
 import { Kysely } from 'kysely';
-import { AerieConfig } from '../aerie-config';
-import type { PostgresDb, MySqlDb, SqliteDb } from './dialects';
+import type { MySqlDb, PostgresDb, SqliteDb } from './dialects';
 import { DbDialectFactory } from './dialects/dialect.factory';
 
 export type DbType<TSchema extends Record<string, unknown>> = {

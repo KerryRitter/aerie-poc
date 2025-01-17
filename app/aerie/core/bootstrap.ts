@@ -1,10 +1,10 @@
-import type { Type } from './types';
+import { AerieCommonModule } from '@aerie/common/common.module';
+import { DbService } from '@aerie/db';
 import { AerieConfig, type DrizzleConfig } from './aerie-config';
-import { Router } from './router';
-import { getModuleMetadata, Module } from './decorators/module.decorator';
-import { AerieCommonModule } from './common/common.module';
-import { DbService } from './db';
 import { Container } from './container';
+import { getModuleMetadata, Module } from './decorators/module.decorator';
+import { Router } from './router';
+import type { Type } from './types';
 
 type AppConfig = {
   viewGuardRedirect?: string;

@@ -1,29 +1,27 @@
+import { PipeTransform } from '@aerie/common/pipes';
+import { ActionFunction, LoaderFunction, redirect } from '@remix-run/node';
+import { useLoaderData } from '@remix-run/react';
+import { matchPath } from '@remix-run/router';
+import * as React from 'react';
+import { ReactElement } from 'react';
+import { ModuleLoaderProvider } from '../react/hooks';
 import { AerieConfig } from './aerie-config';
-import { PipeTransform } from './pipes';
+import { Container } from './container';
+import { getControllerMetadata } from './decorators/http.decorator';
+import { ModuleLoader } from './module-loader';
 import {
-  Middleware,
-  NextFunction,
-  Type,
-  Guard,
-  ExecutionContext,
-  Interceptor,
-} from './types';
-import {
-  MIDDLEWARE_METADATA,
-  ROUTES_METADATA,
   GUARDS_METADATA,
   INTERCEPTORS_METADATA,
+  MIDDLEWARE_METADATA,
+  ROUTES_METADATA,
 } from './reflect';
-import { ReactElement } from 'react';
-import { LoaderFunction, ActionFunction, redirect } from '@remix-run/node';
-import { Container } from './container';
-import * as React from 'react';
-import { useLocation } from '@remix-run/react';
-import { useLoaderData } from '@remix-run/react';
-import { ModuleLoaderProvider } from '../react/hooks';
-import { ModuleLoader } from './module-loader';
-import { getControllerMetadata } from './decorators/http.decorator';
-import { matchPath } from '@remix-run/router';
+import {
+  ExecutionContext,
+  Guard,
+  Interceptor,
+  Middleware,
+  Type,
+} from './types';
 
 type RouteParam = {
   name: string;
