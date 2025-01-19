@@ -1,18 +1,16 @@
+import { AerieConfig } from '@aerie/core/aerie-config';
+import { Module } from '@aerie/core/decorators';
+import { DbModule } from '@aerie/db';
+import { LoggerModule } from '@aerie/logging/logger.module';
 import {
   DefaultValuePipe,
   ParseBoolPipe,
   ParseIntPipe,
   ValidationPipe,
-} from '@aerie/common/pipes';
-import { AerieConfig } from '@aerie/core/aerie-config';
-import { Module } from '@aerie/core/decorators';
-import { DbService } from '@aerie/db';
-import { DbDialectFactory } from '@aerie/db/dialects/dialect.factory';
-import { MySqlDbDialect } from '@aerie/db/dialects/mysql';
-import { PostgresDbDialect } from '@aerie/db/dialects/postgres';
-import { SqliteDbDialect } from '@aerie/db/dialects/sqlite';
+} from './pipes';
 
 @Module({
+  imports: [DbModule, LoggerModule.forRoot()],
   providers: [
     // Core providers
     AerieConfig,
@@ -20,14 +18,7 @@ import { SqliteDbDialect } from '@aerie/db/dialects/sqlite';
     ParseBoolPipe,
     DefaultValuePipe,
     ValidationPipe,
-
-    // Database providers in dependency order
-    PostgresDbDialect,
-    MySqlDbDialect,
-    SqliteDbDialect,
-    DbDialectFactory,
-    DbService,
   ],
-  exports: [AerieConfig, DbService],
+  exports: [AerieConfig],
 })
 export class AerieCommonModule {}

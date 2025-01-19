@@ -17,7 +17,7 @@ export function useModuleLoader() {
 
 export function useProvider<T>(token: new (...args: any[]) => T): T;
 export function useProvider<T>(token: string | symbol): T;
-export function useProvider<T>(token: any): T {
+export async function useProvider<T>(token: any): Promise<T> {
   const loader = useModuleLoader();
-  return loader.getProvider<T>(token);
+  return await loader.getProvider<T>(token);
 }

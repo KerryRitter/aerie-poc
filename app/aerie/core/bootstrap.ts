@@ -1,166 +1,116 @@
-import { AerieCommonModule } from '@aerie/common/common.module';
-import { DbService } from '@aerie/db';
-import { AerieConfig, type DrizzleConfig } from './aerie-config';
 import { Container } from './container';
-import { getModuleMetadata, Module } from './decorators/module.decorator';
 import { Router } from './router';
-import type { Type } from './types';
-
-type AppConfig = {
-  viewGuardRedirect?: string;
-  database?: {
-    schema: any;
-    drizzleConfig?: DrizzleConfig;
-  };
-};
-
-type InitConfig = Omit<Partial<AerieConfig>, 'database'> & AppConfig;
+import type { Type, DynamicModule, DynamicModuleAsync } from './types';
+import { AerieConfig } from './aerie-config';
+import {
+  getModuleMetadata,
+  getDynamicModuleMetadata,
+} from './decorators/module.decorator';
 
 export class AppBootstrap {
   private static instance: AppBootstrap;
-  private isInitialized = false;
-  private config: AerieConfig;
+  private container: Container;
   private router: Router;
-  private registeredModules = new Set<Type>();
 
-  static async initializeRoot<TModule extends Type>(
-    rootModule: TModule,
-    config: AppConfig = {}
-  ) {
-    const app = await this.getInstance({
-      rootModule,
+  private constructor() {
+    this.container = Container.getInstance();
+    this.router = null as any;
+  }
+
+  static async initializeRoot(
+    rootModule: Type,
+    config: any = {}
+  ): Promise<AppBootstrap> {
+    if (!AppBootstrap.instance) {
+      AppBootstrap.instance = new AppBootstrap();
+    }
+
+    // Initialize config first
+    const aerieConfig = await AerieConfig.initialize({
       ...config,
+      rootModule,
     });
-    await app.ensureRootInitialized();
-    return app;
+    AppBootstrap.instance.container.register(AerieConfig);
+    AppBootstrap.instance.container.setInstance(AerieConfig, aerieConfig);
+
+    // Initialize the router
+    AppBootstrap.instance.router = Router.initialize(aerieConfig);
+
+    // Initialize root module
+    await AppBootstrap.instance.initializeModule(rootModule);
+
+    return AppBootstrap.instance;
   }
 
-  static async getInstance(config: InitConfig) {
-    if (!this.instance) {
-      this.instance = await AppBootstrap.create(config);
-    }
-    return this.instance;
-  }
-
-  private static async create(config: InitConfig): Promise<AppBootstrap> {
-    return new AppBootstrap(
-      await AerieConfig.initialize(config, config.database)
-    );
-  }
-
-  private constructor(config: AerieConfig) {
-    this.config = config;
-
-    // Register the actual instance in the container before anything else
-    const container = Container.getInstance();
-    container.register(AerieConfig);
-    container.setInstance(AerieConfig, config);
-
-    // Now initialize router with our config
-    this.router = Router.getInstance(this.config);
-  }
-
-  async ensureRootInitialized() {
-    if (this.isInitialized) {
-      return this;
-    }
-
-    // Register AerieCommonModule first to ensure core services are available
-    await this.registerModule(AerieCommonModule);
-
-    // Initialize DbService if needed
-    if (this.config.database.dialect !== 'none') {
-      console.log('Initializing DB with config:', this.config.database);
-      const dbService = this.router
-        .getContainer()
-        .resolve<DbService<any>>(DbService);
-      await dbService.initializeConnection();
-    }
-
-    // Register the root module with AerieCommonModule automatically imported
-    const rootMetadata = getModuleMetadata(this.config.rootModule);
-    if (!rootMetadata) {
-      throw new Error(
-        `Root module ${this.config.rootModule.name} is not decorated with @Module`
-      );
-    }
-
-    // Create a new module that extends the root module
-    @Module({
-      imports: [...(rootMetadata.imports || [])],
-      controllers:
-        rootMetadata.apiControllers?.concat(
-          rootMetadata.viewControllers || []
-        ) || [],
-      providers: [...(rootMetadata.providers || [])],
-    })
-    class EnhancedRootModule extends this.config.rootModule {}
-
-    await this.registerModule(EnhancedRootModule);
-    this.isInitialized = true;
-    return this;
-  }
-
-  private async registerModule(moduleClass: Type) {
-    if (this.registeredModules.has(moduleClass)) {
-      return this;
-    }
-
-    console.log('Registering module:', moduleClass.name);
+  private async initializeModule(
+    module: Type | DynamicModule | DynamicModuleAsync
+  ) {
+    const moduleClass = this.getModuleClass(module);
     const metadata = getModuleMetadata(moduleClass);
+    const dynamicMetadata = getDynamicModuleMetadata(moduleClass);
+
     if (!metadata) {
-      throw new Error(
-        `Module ${moduleClass.name} is not decorated with @Module`
-      );
+      throw new Error(`${moduleClass.name} is not a valid module`);
     }
 
-    // Register imports first
-    if (metadata.imports) {
-      for (const importedModule of metadata.imports) {
-        await this.registerModule(importedModule);
-      }
+    // Register the module class itself
+    this.container.register(moduleClass);
+
+    // Register module providers
+    const providers = [
+      ...(metadata.providers || []),
+      ...(dynamicMetadata?.providers || []),
+    ];
+
+    for (const provider of providers) {
+      this.container.register(provider);
     }
 
-    // Register providers first
-    if (metadata.providers) {
-      for (const provider of metadata.providers) {
-        this.router.getContainer().register(provider);
-      }
+    // Initialize imports recursively
+    const imports = [
+      ...(metadata.imports || []),
+      ...(dynamicMetadata?.imports || []),
+    ];
+
+    for (const importedModule of imports) {
+      await this.initializeModule(importedModule);
     }
 
-    // Register API controllers
+    // Register controllers with the container
     if (metadata.apiControllers) {
       for (const controller of metadata.apiControllers) {
-        this.router.getContainer().register(controller);
+        this.container.register(controller);
       }
     }
-
-    // Register view controllers
     if (metadata.viewControllers) {
       for (const controller of metadata.viewControllers) {
-        this.router.getContainer().register(controller);
+        this.container.register(controller);
       }
     }
 
-    // Now register routes after all controllers are registered
+    // Create module instance with router
+    await this.container.resolve(moduleClass);
+
+    // Register routes after module is initialized
     if (metadata.apiControllers) {
       for (const controller of metadata.apiControllers) {
         this.router.registerController(controller);
       }
     }
-
     if (metadata.viewControllers) {
       for (const controller of metadata.viewControllers) {
         this.router.registerController(controller);
       }
     }
-
-    this.registeredModules.add(moduleClass);
-    return this;
   }
 
-  getRouter() {
-    return this.router;
+  private getModuleClass(
+    module: Type | DynamicModule | DynamicModuleAsync
+  ): Type {
+    if (typeof module === 'function') {
+      return module;
+    }
+    return module.module;
   }
 
   createRemixApiRoute() {

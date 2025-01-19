@@ -1,4 +1,4 @@
-import { Injectable } from '../decorators/injectable.decorator';
+import { Injectable } from '@aerie/core';
 import { PipeTransform, ArgumentMetadata } from './types';
 
 @Injectable()

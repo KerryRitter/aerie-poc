@@ -19,9 +19,16 @@ import {
   ExecutionContext,
   Guard,
   Interceptor,
-  Middleware,
+  MiddlewareProvider,
   Type,
+  Middleware,
 } from './types';
+import {
+  ForbiddenException,
+  HttpException,
+  InternalServerErrorException,
+} from './exceptions';
+import { getModuleRef, getModuleMetadata } from './decorators/module.decorator';
 
 type RouteParam = {
   name: string;
@@ -64,15 +71,32 @@ export class Router {
   private viewHandlers: Map<string, ViewHandler> = new Map();
   private viewRegistry: ViewRegistry = {};
   private readonly container: Container;
-  private globalMiddleware: Middleware[] = [];
+  private globalMiddleware: MiddlewareProvider[] = [];
   private globalGuards: Guard[] = [];
   private globalInterceptors: Interceptor[] = [];
 
   private constructor(private readonly config: AerieConfig) {
     this.container = Container.getInstance();
+    this.container.setInstance(AerieConfig, config);
+
+    // Register routes for all registered controllers
+    const controllers = this.container.getAllRegistered();
+    for (const controller of controllers) {
+      this.registerControllerRoutes(controller);
+    }
   }
 
-  static getInstance(config: AerieConfig): Router {
+  static getInstance(config?: AerieConfig): Router {
+    if (!Router.instance) {
+      if (!config) {
+        throw new Error('Router must be initialized with config first');
+      }
+      Router.instance = new Router(config);
+    }
+    return Router.instance;
+  }
+
+  static initialize(config: AerieConfig): Router {
     if (!Router.instance) {
       Router.instance = new Router(config);
     }
@@ -146,7 +170,10 @@ export class Router {
     route: ApiRoute,
     params: any[]
   ) {
-    const controller = this.container.resolve(route.controller);
+    console.log('Handling API route:', route);
+    const controller = await this.container.resolve(route.controller);
+    console.log('Resolved controller:', controller);
+
     const result = await this.processRequest(
       request,
       response,
@@ -154,6 +181,7 @@ export class Router {
       route.methodName,
       params
     );
+    console.log('API route result:', result);
     return result;
   }
 
@@ -170,7 +198,7 @@ export class Router {
       return null;
     }
 
-    const controller = this.container.resolve(route.controller);
+    const controller = await this.container.resolve(route.controller);
     console.log('Resolved controller:', controller);
 
     const result = await this.processRequest(
@@ -183,9 +211,11 @@ export class Router {
     console.log('Controller result:', result);
 
     // For view controllers, return the result with the viewId
-    const viewId = `${route.path}/${route.methodName}`
-      .replace(/\/+/g, '/')
-      .replace(/^\/+|\/+$/g, '');
+    const viewId =
+      `${route.controller.name.replace('Controller', '').toLowerCase()}/${route.methodName}`.replace(
+        /^\/+|\/+$/g,
+        ''
+      );
     console.log('Generated viewId:', viewId);
 
     const finalResult = {
@@ -203,218 +233,275 @@ export class Router {
     methodName: string,
     params: any[]
   ) {
-    // Check guards first
-    const guards = this.getGuards(target.constructor, methodName);
-    const context: ExecutionContext = {
-      request,
-      response,
-      type:
-        this.findMatchingRoute(new URL(request.url).pathname, request.method)
-          ?.type === 'api'
-          ? 'api'
-          : 'view',
-    };
+    try {
+      const context: ExecutionContext = {
+        request,
+        response,
+        type: request.url.includes('/api/') ? 'api' : 'view',
+      };
 
-    for (const guard of guards) {
-      const canActivate = await guard.canActivate(context);
-      if (!canActivate) {
-        if (context.type === 'api') {
-          return { statusCode: 401, message: 'Unauthorized' };
-        } else {
-          throw redirect(this.config.viewGuardRedirect || 'auth/login');
+      // First check guards
+      const guards = await this.getGuards(target.constructor, methodName);
+      for (const guard of guards) {
+        const canActivate = await guard.canActivate(context);
+        if (!canActivate) {
+          throw new ForbiddenException();
         }
       }
-    }
 
-    // Then process middleware and interceptors
-    const middleware = this.getMiddleware(target.constructor, methodName);
-    const interceptors = this.getInterceptors(target.constructor, methodName);
-
-    // Create the final handler that includes middleware and the actual method
-    const handler = async () => {
-      return this.executeMiddleware(middleware, request, response, () =>
-        target[methodName].apply(target, params)
+      // Then process middleware and interceptors
+      const middleware = await this.getMiddleware(
+        target.constructor,
+        methodName
       );
-    };
+      const interceptors = await this.getInterceptors(
+        target.constructor,
+        methodName
+      );
 
-    // Chain interceptors
-    const chainedHandler = interceptors.reduceRight(
-      (next, interceptor) => ({
-        handle: () => interceptor.intercept(context, next),
-      }),
-      { handle: handler }
-    );
+      // Create the final handler that includes middleware and the actual method
+      const handler = async () => {
+        return this.executeMiddleware(middleware, request, response, () =>
+          target[methodName].apply(target, params)
+        );
+      };
 
-    return chainedHandler.handle();
+      // Apply interceptors
+      const handle = interceptors.reduce(
+        (next, interceptor) => ({
+          handle: () => interceptor.intercept(context, next),
+        }),
+        { handle: handler }
+      );
+
+      return await handle.handle();
+    } catch (error) {
+      console.error('Error processing request:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        error instanceof Error ? error.message : 'Unknown error occurred'
+      );
+    }
   }
 
-  private getGuards(target: any, methodName?: string): Guard[] {
+  private async getGuards(target: any, methodName?: string): Promise<Guard[]> {
     const classGuards: Guard[] =
       Reflect.getMetadata(GUARDS_METADATA, target) || [];
     const methodGuards: Guard[] = methodName
       ? Reflect.getMetadata(GUARDS_METADATA, target, methodName) || []
       : [];
 
-    return [...this.globalGuards, ...classGuards, ...methodGuards];
+    // Get module-level guards
+    const moduleRef = getModuleRef(target);
+    const moduleMetadata = moduleRef ? getModuleMetadata(moduleRef) : undefined;
+    const moduleGuards = moduleMetadata?.guards || [];
+
+    const resolveGuard = async (guard: Guard | Type<Guard>): Promise<Guard> => {
+      if (typeof guard === 'function' && !('canActivate' in guard)) {
+        return this.container.resolve(guard);
+      }
+      return guard as Guard;
+    };
+
+    const resolvedModuleGuards = await Promise.all(
+      moduleGuards.map(resolveGuard)
+    );
+    const resolvedClassGuards = await Promise.all(
+      classGuards.map(resolveGuard)
+    );
+    const resolvedMethodGuards = await Promise.all(
+      methodGuards.map(resolveGuard)
+    );
+
+    return [
+      ...resolvedModuleGuards,
+      ...resolvedClassGuards,
+      ...resolvedMethodGuards,
+    ];
   }
 
-  private getMiddleware(target: any, methodName?: string): Middleware[] {
-    const classMiddleware: Middleware[] =
+  private async getMiddleware(
+    target: any,
+    methodName?: string
+  ): Promise<MiddlewareProvider[]> {
+    const classMiddleware: MiddlewareProvider[] =
       Reflect.getMetadata(MIDDLEWARE_METADATA, target) || [];
-    const methodMiddleware: Middleware[] = methodName
+    const methodMiddleware: MiddlewareProvider[] = methodName
       ? Reflect.getMetadata(MIDDLEWARE_METADATA, target, methodName) || []
       : [];
 
-    return [...this.globalMiddleware, ...classMiddleware, ...methodMiddleware];
-  }
+    // Get module-level middleware
+    const moduleRef = getModuleRef(target);
+    const moduleMetadata = moduleRef ? getModuleMetadata(moduleRef) : undefined;
+    const moduleMiddleware = moduleMetadata?.middleware || [];
 
-  private executeMiddleware(
-    middleware: Middleware[],
-    request: Request,
-    response: Response,
-    handler: () => Promise<any>
-  ): Promise<any> {
-    // If no middleware, just run the handler
-    if (middleware.length === 0) {
-      return handler();
-    }
-
-    let index = 0;
-
-    const next = async (): Promise<any> => {
-      if (index >= middleware.length) {
-        return handler();
+    const resolveMiddleware = async (
+      middleware: MiddlewareProvider
+    ): Promise<MiddlewareProvider> => {
+      if (typeof middleware === 'function' && !('use' in middleware)) {
+        return middleware;
       }
-
-      const current = middleware[index++];
-
-      if (typeof current === 'function') {
-        return current(request, response, next);
-      } else {
-        return current.use(request, response, next);
-      }
+      return this.container.resolve(middleware as unknown as Type);
     };
 
-    return next();
+    const resolvedModuleMiddleware = await Promise.all(
+      moduleMiddleware.map(resolveMiddleware)
+    );
+    const resolvedClassMiddleware = await Promise.all(
+      classMiddleware.map(resolveMiddleware)
+    );
+    const resolvedMethodMiddleware = await Promise.all(
+      methodMiddleware.map(resolveMiddleware)
+    );
+
+    return [
+      ...resolvedModuleMiddleware,
+      ...resolvedClassMiddleware,
+      ...resolvedMethodMiddleware,
+    ];
   }
 
-  private getInterceptors(target: any, methodName?: string): Interceptor[] {
+  private async executeMiddleware(
+    middleware: MiddlewareProvider[],
+    request: Request,
+    response: Response,
+    next: () => Promise<any>
+  ): Promise<any> {
+    if (!middleware.length) {
+      return next();
+    }
+
+    const executeNext = async (index: number): Promise<any> => {
+      if (index >= middleware.length) {
+        return next();
+      }
+
+      const handler = middleware[index];
+
+      // Handle class-based middleware
+      if (
+        typeof handler === 'function' &&
+        'prototype' in handler &&
+        handler.prototype.use
+      ) {
+        const middlewareClass = handler as unknown as Type<Middleware>;
+        const instance =
+          await this.container.resolve<Middleware>(middlewareClass);
+        return instance.use(request, response, () => executeNext(index + 1));
+      }
+
+      // Handle function middleware
+      if (typeof handler === 'function') {
+        return handler(request, response, () => executeNext(index + 1));
+      }
+
+      // Handle instance middleware
+      return handler.use(request, response, () => executeNext(index + 1));
+    };
+
+    return executeNext(0);
+  }
+
+  private async getInterceptors(
+    target: any,
+    methodName?: string
+  ): Promise<Interceptor[]> {
     const classInterceptors: Interceptor[] =
       Reflect.getMetadata(INTERCEPTORS_METADATA, target) || [];
     const methodInterceptors: Interceptor[] = methodName
       ? Reflect.getMetadata(INTERCEPTORS_METADATA, target, methodName) || []
       : [];
 
+    // Get module-level interceptors
+    const moduleRef = getModuleRef(target);
+    const moduleMetadata = moduleRef ? getModuleMetadata(moduleRef) : undefined;
+    const moduleInterceptors = moduleMetadata?.interceptors || [];
+
+    const resolveInterceptor = async (
+      interceptor: Interceptor | Type<Interceptor>
+    ): Promise<Interceptor> => {
+      if (typeof interceptor === 'function' && !('intercept' in interceptor)) {
+        return this.container.resolve(interceptor);
+      }
+      return interceptor as Interceptor;
+    };
+
+    const resolvedModuleInterceptors = await Promise.all(
+      moduleInterceptors.map(resolveInterceptor)
+    );
+    const resolvedClassInterceptors = await Promise.all(
+      classInterceptors.map(resolveInterceptor)
+    );
+    const resolvedMethodInterceptors = await Promise.all(
+      methodInterceptors.map(resolveInterceptor)
+    );
+
     return [
-      ...this.globalInterceptors,
-      ...classInterceptors,
-      ...methodInterceptors,
+      ...resolvedModuleInterceptors,
+      ...resolvedClassInterceptors,
+      ...resolvedMethodInterceptors,
     ];
   }
 
-  registerController(controllerClass: Type) {
-    const metadata = getControllerMetadata(controllerClass);
-    if (!metadata) {
-      console.log('No controller metadata for:', controllerClass.name);
-      return;
-    }
-
-    console.log('Registering controller:', {
-      name: controllerClass.name,
-      path: metadata.path,
-      metadata: metadata,
+  registerController(controller: Type) {
+    console.log('Registering controller:', controller.name);
+    const metadata = getControllerMetadata(controller);
+    console.log('Controller metadata:', metadata);
+    const routes = Reflect.getMetadata(ROUTES_METADATA, controller) || [];
+    console.log('Routes metadata:', routes);
+    this.registerControllerRoutes(controller);
+    console.log('Current routes:', {
+      api: this.apiRoutes,
+      view: this.viewRoutes,
     });
+  }
+
+  private registerControllerRoutes(controller: Type) {
+    const metadata = getControllerMetadata(controller);
+    if (!metadata) return;
 
     if (metadata.type === 'api') {
-      // Register API routes
-      for (const [methodName, routeMetadata] of metadata.routes.entries()) {
-        if (typeof methodName === 'string') {
-          this.addApiRoute(
-            metadata.path + (routeMetadata.path || ''),
-            routeMetadata.method || 'GET',
-            controllerClass,
-            methodName,
-            [] // We'll need to implement param extraction
-          );
-        }
+      for (const [key, route] of metadata.routes.entries()) {
+        this.apiRoutes.push({
+          type: 'api',
+          path: `${metadata.path}/${route.path}`.replace(/\/+/g, '/'),
+          method: route.method,
+          controller,
+          methodName: key.toString(),
+          params: [],
+        });
       }
-    } else if (metadata.type === 'view') {
-      // Register view routes and components
-      for (const [methodName, routeMetadata] of metadata.routes.entries()) {
-        if (typeof methodName === 'string') {
-          // Add to viewRoutes for routing
-          this.addViewRoute(
-            metadata.path,
-            controllerClass,
-            metadata.component || null,
-            methodName
+    } else {
+      for (const [key, route] of metadata.routes.entries()) {
+        const path = `${metadata.path}/${route.path}`.replace(/\/+/g, '/');
+        const viewId =
+          `${controller.name.replace('Controller', '').toLowerCase()}/${String(key)}`.replace(
+            /^\/+|\/+$/g,
+            ''
           );
 
-          // Add to viewRegistry for component lookup
-          if (metadata.component) {
-            // Use the same format as handleViewRoute: path/methodName
-            const viewId = `${metadata.path}/${methodName}`
-              .replace(/\/+/g, '/')
-              .replace(/^\/+|\/+$/g, '');
-            console.log('Registering component with viewId:', viewId);
-            this.viewRegistry[viewId] = () => metadata.component!;
-          }
+        // Register the component in the view registry
+        if (
+          metadata.component &&
+          typeof metadata.component.type === 'function'
+        ) {
+          console.log('Registering view component:', {
+            viewId,
+            component: metadata.component.type.name,
+            path,
+          });
+          this.viewRegistry[viewId] = metadata.component.type;
         }
-      }
-    }
-  }
 
-  private addApiRoute(
-    path: string,
-    method: string,
-    controller: Type,
-    methodName: string,
-    params: RouteParam[]
-  ) {
-    this.apiRoutes.push({
-      type: 'api',
-      path,
-      method,
-      controller,
-      methodName,
-      params,
-    });
-  }
-
-  private addViewRoute(
-    path: string,
-    controller: Type,
-    component: ReactElement | null,
-    methodName: string | undefined
-  ) {
-    this.viewRoutes.push({
-      type: 'view',
-      path,
-      controller,
-      component,
-      methodName,
-    });
-  }
-
-  private registerModule(module: any) {
-    const routes: Route[] = Reflect.getMetadata(ROUTES_METADATA, module) || [];
-
-    for (const route of routes) {
-      if (route.type === 'api') {
-        this.addApiRoute(
-          route.path,
-          route.method,
-          route.controller,
-          route.methodName,
-          route.params || []
-        );
-      } else if (route.type === 'view') {
-        this.addViewRoute(
-          route.path,
-          route.controller,
-          route.component,
-          route.methodName
-        );
+        this.viewRoutes.push({
+          type: 'view',
+          path,
+          controller,
+          component: metadata.component || null,
+          methodName: key.toString(),
+        });
       }
     }
   }
@@ -509,20 +596,25 @@ export class Router {
     };
   }
 
-  useGlobalMiddleware(middleware: Type<Middleware>) {
-    const instance = this.container.resolve(middleware) as Middleware;
-    this.globalMiddleware.push(instance);
+  async useGlobalMiddleware(middleware: Type<MiddlewareProvider>) {
+    const instance =
+      await this.container.resolve<MiddlewareProvider>(middleware);
+    if (typeof instance === 'function') {
+      this.globalMiddleware.push(instance);
+    } else if (typeof instance.use === 'function') {
+      this.globalMiddleware.push(instance.use.bind(instance));
+    }
     return this;
   }
 
-  useGlobalGuards(guard: Type<Guard>) {
-    const instance = this.container.resolve(guard) as Guard;
+  async useGlobalGuards(guard: Type<Guard>) {
+    const instance = await this.container.resolve<Guard>(guard);
     this.globalGuards.push(instance);
     return this;
   }
 
-  useGlobalInterceptors(interceptor: Type<Interceptor>) {
-    const instance = this.container.resolve(interceptor) as Interceptor;
+  async useGlobalInterceptors(interceptor: Type<Interceptor>) {
+    const instance = await this.container.resolve<Interceptor>(interceptor);
     this.globalInterceptors.push(instance);
     return this;
   }

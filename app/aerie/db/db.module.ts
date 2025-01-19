@@ -1,9 +1,9 @@
-import { Module } from '../decorators/module.decorator';
+import { Module } from '@aerie/core';
 import { DbService } from './db.service';
 import {
   DbDialectFactory,
-  PostgresDbDialect,
   MySqlDbDialect,
+  PostgresDbDialect,
   SqliteDbDialect,
 } from './dialects';
 

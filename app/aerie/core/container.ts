@@ -1,4 +1,10 @@
-import type { Type } from './types';
+import type {
+  Type,
+  Provider,
+  ClassProvider,
+  ValueProvider,
+  FactoryProvider,
+} from './types';
 import {
   getInjectableMetadata,
   getInjectMetadata,
@@ -11,7 +17,7 @@ const metadataStore = new Map<string, any>();
 
 export class Container {
   private static instance: Container;
-  private providers = new Map<string, Type>();
+  private providers = new Map<string, Provider>();
   private instances = new Map<string, any>();
 
   private constructor() {}
@@ -23,41 +29,31 @@ export class Container {
     return Container.instance;
   }
 
-  register(provider: Type) {
-    const key = provider.name;
+  register(provider: Provider) {
+    const key = this.getProviderKey(this.getProviderToken(provider));
     if (this.providers.has(key)) {
       return;
     }
 
-    console.log('=== REGISTERING PROVIDER ===');
-    console.log('Provider:', key);
-    console.log('Dependencies:', getDependenciesMetadata(provider));
-    console.log('=== END REGISTERING PROVIDER ===');
+    if (typeof provider === 'function') {
+      // Store metadata when registering a class provider
+      if (!metadataStore.has(key)) {
+        const dependencies = getDependenciesMetadata(provider) || [];
+        const injectableMetadata = getInjectableMetadata(provider);
+        const injectMetadata = getInjectMetadata(provider);
 
-    // Store metadata when registering the provider
-    if (!metadataStore.has(key)) {
-      const dependencies = getDependenciesMetadata(provider) || [];
-      const injectableMetadata = getInjectableMetadata(provider);
-      const injectMetadata = getInjectMetadata(provider);
-
-      console.log('=== STORING METADATA ===');
-      console.log('Key:', key);
-      console.log('Dependencies:', dependencies);
-      console.log('Injectable Metadata:', injectableMetadata);
-      console.log('Inject Metadata:', injectMetadata);
-      console.log('=== END STORING METADATA ===');
-
-      metadataStore.set(key, {
-        dependencies,
-        injectableMetadata,
-        injectMetadata,
-      });
+        metadataStore.set(key, {
+          dependencies,
+          injectableMetadata,
+          injectMetadata,
+        });
+      }
     }
 
     this.providers.set(key, provider);
   }
 
-  resolve<T>(token: InjectToken): T {
+  async resolve<T>(token: InjectToken): Promise<T> {
     const key = this.getProviderKey(token);
     const provider = this.providers.get(key);
 
@@ -71,45 +67,63 @@ export class Container {
       return existingInstance;
     }
 
-    console.log('=== RESOLVING PROVIDER ===');
-    console.log('Token:', key);
-    console.log('Provider:', provider.name);
-    console.log('Metadata Store:', metadataStore);
-    console.log('=== END RESOLVING PROVIDER ===');
-
-    // Get metadata from our store
-    const metadata = metadataStore.get(key) || {
-      dependencies: [],
-      injectableMetadata: {},
-      injectMetadata: {},
-    };
-
-    const { dependencies, injectableMetadata, injectMetadata } = metadata;
-
-    // Resolve dependencies recursively
-    const resolvedDependencies = dependencies.map(
-      (dependency: InjectToken, index: number) => {
-        // Check if we have a custom injection token
-        const injectToken = injectMetadata?.[index];
-        if (injectToken) {
-          return this.resolve(injectToken);
-        }
-        return this.resolve(dependency);
-      }
-    );
-
-    // Create instance
-    const instance = new provider(...resolvedDependencies);
+    const instance = await this.createInstance<T>(provider);
 
     // Cache instance if singleton (default)
+    const metadata = metadataStore.get(key);
     if (
-      !injectableMetadata?.scope ||
-      injectableMetadata.scope === 'singleton'
+      !metadata?.injectableMetadata?.scope ||
+      metadata.injectableMetadata.scope === 'singleton'
     ) {
       this.instances.set(key, instance);
     }
 
     return instance;
+  }
+
+  private async createInstance<T>(provider: Provider): Promise<T> {
+    if (typeof provider === 'function') {
+      // Handle class provider (direct Type)
+      const metadata = metadataStore.get(provider.name) || {
+        dependencies: [],
+        injectableMetadata: {},
+        injectMetadata: {},
+      };
+
+      const resolvedDependencies = await Promise.all(
+        metadata.dependencies.map(
+          async (dependency: InjectToken, index: number) => {
+            const injectToken = metadata.injectMetadata?.[index];
+            return this.resolve(injectToken || dependency);
+          }
+        )
+      );
+
+      return new provider(...resolvedDependencies);
+    }
+
+    if (this.isClassProvider(provider)) {
+      // Handle useClass
+      const { useClass, inject = [] } = provider;
+      const deps = await Promise.all(inject.map((dep) => this.resolve(dep)));
+      return new useClass(...deps);
+    }
+
+    if (this.isValueProvider(provider)) {
+      // Handle useValue
+      return provider.useValue;
+    }
+
+    if (this.isFactoryProvider(provider)) {
+      // Handle useFactory
+      const { useFactory, inject = [] } = provider;
+      const deps = await Promise.all(inject.map((dep) => this.resolve(dep)));
+      return useFactory(...deps);
+    }
+
+    throw new Error(
+      `Invalid provider type for ${this.getProviderKey(this.getProviderToken(provider))}`
+    );
   }
 
   private getProviderKey(token: InjectToken): string {
@@ -122,8 +136,33 @@ export class Container {
     return token.name;
   }
 
+  private getProviderToken(provider: Provider): InjectToken {
+    if (typeof provider === 'function') {
+      return provider;
+    }
+    return provider.provide;
+  }
+
+  private isClassProvider(provider: Provider): provider is ClassProvider {
+    return typeof provider === 'object' && 'useClass' in provider;
+  }
+
+  private isValueProvider(provider: Provider): provider is ValueProvider {
+    return typeof provider === 'object' && 'useValue' in provider;
+  }
+
+  private isFactoryProvider(provider: Provider): provider is FactoryProvider {
+    return typeof provider === 'object' && 'useFactory' in provider;
+  }
+
   setInstance<T>(token: InjectToken, instance: T) {
     const key = this.getProviderKey(token);
     this.instances.set(key, instance);
+  }
+
+  getAllRegistered(): Type[] {
+    return Array.from(this.providers.values()).map((p) =>
+      'useClass' in p ? p.useClass : p
+    ) as Type[];
   }
 }

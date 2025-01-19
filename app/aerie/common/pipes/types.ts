@@ -1,4 +1,4 @@
-import { Type } from '../types';
+import { Type } from '@aerie/core';
 
 export interface ArgumentMetadata {
   type: 'body' | 'query' | 'param' | 'custom';

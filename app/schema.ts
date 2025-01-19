@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { DbService } from '@aerie/core/db';
+import { DbService } from '@aerie/db';
 
 export const users = sqliteTable('users', {
   id: integer('id').primaryKey(),

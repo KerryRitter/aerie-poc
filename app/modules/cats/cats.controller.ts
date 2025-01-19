@@ -10,9 +10,6 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
-  UseInterceptors,
-  UseMiddleware,
 } from '@aerie/core/decorators';
 import { ParseIntPipe } from '@aerie/common/pipes';
 import { CatsService } from './cats.service';
@@ -20,6 +17,9 @@ import type { Cat } from './cats.types';
 import { AuthGuard } from './guards/auth.guard';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { LoggingMiddleware } from './middleware/logging.middleware';
+import { UseMiddleware } from '@aerie/core/decorators/middleware.decorator';
+import { UseGuards } from '@aerie/core/decorators/guards.decorator';
+import { UseInterceptors } from '@aerie/core/decorators/interceptors.decorator';
 
 @Dependencies(CatsService)
 @Controller('cats')

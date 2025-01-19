@@ -1,6 +1,4 @@
-import { AerieConfig } from '@aerie/core/aerie-config';
-import { Dependencies, Injectable } from '@aerie/core/decorators';
-import { ServerOnly } from '@aerie/core/environment/decorators';
+import { AerieConfig, Dependencies, Injectable, ServerOnly } from '@aerie/core';
 import { Kysely } from 'kysely';
 import type { MySqlDb, PostgresDb, SqliteDb } from './dialects';
 import { DbDialectFactory } from './dialects/dialect.factory';
