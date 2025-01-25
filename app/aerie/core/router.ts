@@ -210,6 +210,11 @@ export class Router {
     );
     console.log('Controller result:', result);
 
+    // If the result is a Response (like a redirect), return it directly
+    if (result instanceof Response) {
+      return result;
+    }
+
     // For view controllers, return the result with the viewId
     const viewId =
       `${route.controller.name.replace('Controller', '').toLowerCase()}/${route.methodName}`.replace(
@@ -245,6 +250,9 @@ export class Router {
       for (const guard of guards) {
         const canActivate = await guard.canActivate(context);
         if (!canActivate) {
+          if (context.type === 'view' && this.config.viewGuardRedirect) {
+            return redirect(this.config.viewGuardRedirect);
+          }
           throw new ForbiddenException();
         }
       }
@@ -277,6 +285,9 @@ export class Router {
       return await handle.handle();
     } catch (error) {
       console.error('Error processing request:', error);
+      if (error instanceof Response) {
+        return error;
+      }
       if (error instanceof HttpException) {
         throw error;
       }
@@ -577,6 +588,9 @@ export class Router {
         const response = new Response();
         const result = await this.handleRequest(request, response);
         console.log('View loader result:', result);
+        if (result instanceof Response) {
+          return result;
+        }
         if (!result) return null;
         return result;
       },
@@ -589,6 +603,9 @@ export class Router {
       }) => {
         const response = new Response();
         const result = await this.handleRequest(request, response);
+        if (result instanceof Response) {
+          return result;
+        }
         if (!result) return null;
         return result;
       },

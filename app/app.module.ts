@@ -13,9 +13,7 @@ import { AuthGuard } from './modules/cats/guards/auth.guard';
 import { LoggingInterceptor } from './modules/cats/interceptors/logging.interceptor';
 import { LoggingMiddleware } from './modules/cats/middleware/logging.middleware';
 import { UsersModule } from './modules/users/users.module';
-import { AerieConfig } from '@aerie/core';
 import { AerieCommonModule } from '@aerie/common';
-import { Dependencies } from '@aerie/core/decorators';
 
 @Module({
   imports: [
@@ -30,26 +28,4 @@ import { Dependencies } from '@aerie/core/decorators';
 @UseModuleMiddleware(LoggingMiddleware)
 @UseModuleGuards(AuthGuard)
 @UseModuleInterceptors(LoggingInterceptor)
-@Dependencies(AerieConfig, DbService)
-export class AppModule {
-  constructor(
-    config: AerieConfig,
-    private readonly dbService: DbService<any>
-  ) {
-    // Get router instance
-    Router.getInstance(config);
-
-    // Initialize database
-    this.initializeDb();
-  }
-
-  private async initializeDb() {
-    try {
-      await this.dbService.initializeConnection();
-      console.log('Database initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize database:', error);
-      throw error;
-    }
-  }
-}
+export class AppModule {}

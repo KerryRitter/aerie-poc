@@ -6,6 +6,7 @@ import {
   getModuleMetadata,
   getDynamicModuleMetadata,
 } from './decorators/module.decorator';
+import { DbService } from '../db';
 
 export class AppBootstrap {
   private static instance: AppBootstrap;
@@ -38,6 +39,9 @@ export class AppBootstrap {
 
     // Initialize root module
     await AppBootstrap.instance.initializeModule(rootModule);
+
+    // Initialize database
+    await AppBootstrap.instance.initializeDb();
 
     return AppBootstrap.instance;
   }
@@ -119,5 +123,19 @@ export class AppBootstrap {
 
   createRemixViewRoute() {
     return this.router.createRemixViewRoute();
+  }
+
+  private async initializeDb() {
+    try {
+      const dbService =
+        await AppBootstrap.instance.container.resolve<DbService<any>>(
+          DbService
+        );
+      await dbService.initializeConnection();
+      console.log('Database initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      throw error;
+    }
   }
 }
